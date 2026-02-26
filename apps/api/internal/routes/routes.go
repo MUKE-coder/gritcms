@@ -48,8 +48,8 @@ func Setup(db *gorm.DB, cfg *config.Config, svc *Services) *gin.Engine {
 	r.Use(middleware.CORS(cfg.CORSOrigins))
 	r.Use(middleware.SecurityHeaders())
 
-	// Limit request body to 10 MB (uploads have separate limit in handler)
-	r.MaxMultipartMemory = 10 << 20
+	// Max memory for multipart form parsing (excess goes to temp files)
+	r.MaxMultipartMemory = 50 << 20
 
 	// Mount Sentinel security suite (WAF, rate limiting, auth shield, anomaly detection)
 	// if cfg.SentinelEnabled {

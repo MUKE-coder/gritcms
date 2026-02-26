@@ -56,12 +56,23 @@ func (h *UploadHandler) Create(c *gin.Context) {
 		return
 	}
 
+	// Explicitly parse multipart form
+	if err := c.Request.ParseMultipartForm(MaxUploadSize); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": gin.H{
+				"code":    "INVALID_REQUEST",
+				"message": fmt.Sprintf("Cannot parse form (Content-Type: %s): %v", c.ContentType(), err),
+			},
+		})
+		return
+	}
+
 	file, header, err := c.Request.FormFile("file")
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error": gin.H{
 				"code":    "INVALID_FILE",
-				"message": "No file provided",
+				"message": fmt.Sprintf("No file in field 'file' (Content-Type: %s): %v", c.ContentType(), err),
 			},
 		})
 		return
