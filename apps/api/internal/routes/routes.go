@@ -44,6 +44,7 @@ func Setup(db *gorm.DB, cfg *config.Config, svc *Services) *gin.Engine {
 	// Global middleware
 	r.Use(middleware.Logger())
 	r.Use(gin.Recovery())
+	log.Printf("[CORS] Allowed origins: %v", cfg.CORSOrigins)
 	r.Use(middleware.CORS(cfg.CORSOrigins))
 	r.Use(middleware.SecurityHeaders())
 

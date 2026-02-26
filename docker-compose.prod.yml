@@ -13,25 +13,7 @@ services:
       APP_ENV: production
       DATABASE_URL: postgres://${POSTGRES_USER:-grit}:${POSTGRES_PASSWORD:-grit}@postgres:5432/${POSTGRES_DB:-gritcms}?sslmode=disable
       REDIS_URL: redis://redis:6379
-      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
-      APP_URL: ${API_URL:-http://localhost:8080}
-      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://localhost:3001}
-      STORAGE_DRIVER: ${STORAGE_DRIVER:-minio}
       MINIO_ENDPOINT: http://minio:9000
-      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-minioadmin}
-      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-minioadmin}
-      MINIO_BUCKET: ${MINIO_BUCKET:-uploads}
-      RESEND_API_KEY: ${RESEND_API_KEY:-}
-      MAIL_FROM: ${MAIL_FROM:-noreply@localhost}
-      AI_PROVIDER: ${AI_PROVIDER:-}
-      AI_API_KEY: ${AI_API_KEY:-}
-      GORM_STUDIO_ENABLED: ${GORM_STUDIO_ENABLED:-false}
-      SENTINEL_ENABLED: ${SENTINEL_ENABLED:-true}
-      SENTINEL_USERNAME: ${SENTINEL_USERNAME:-admin}
-      SENTINEL_PASSWORD: ${SENTINEL_PASSWORD:-sentinel}
-      PULSE_ENABLED: ${PULSE_ENABLED:-true}
-      PULSE_USERNAME: ${PULSE_USERNAME:-admin}
-      PULSE_PASSWORD: ${PULSE_PASSWORD:-pulse}
     depends_on:
       postgres:
         condition: service_healthy
