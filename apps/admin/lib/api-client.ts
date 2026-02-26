@@ -5,15 +5,16 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
 
 export const apiClient = axios.create({
   baseURL: API_URL,
-  headers: {
-    "Content-Type": "application/json",
-  },
 });
 
 apiClient.interceptors.request.use((config) => {
   const token = Cookies.get("access_token");
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
+  }
+  // Let browser auto-set Content-Type with boundary for FormData uploads
+  if (typeof FormData !== "undefined" && config.data instanceof FormData) {
+    delete config.headers["Content-Type"];
   }
   return config;
 });
