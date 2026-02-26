@@ -17,6 +17,7 @@ type StorageConfig struct {
 	Bucket    string
 	Region    string
 	UseSSL    bool
+	PublicURL string // Public base URL for serving files (e.g. R2 dev URL)
 }
 
 // Config holds all application configuration.
@@ -159,6 +160,7 @@ func resolveStorage(driver string) StorageConfig {
 			Bucket:    getEnv("R2_BUCKET", "uploads"),
 			Region:    getEnv("R2_REGION", "auto"),
 			UseSSL:    true,
+			PublicURL: getEnv("R2_PUBLIC_URL", ""),
 		}
 	case "b2":
 		return StorageConfig{

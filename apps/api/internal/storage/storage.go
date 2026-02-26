@@ -135,13 +135,21 @@ func (s *Storage) Delete(ctx context.Context, key string) error {
 
 // GetURL returns the public URL for a stored file.
 func (s *Storage) GetURL(key string) string {
-	endpoint := strings.TrimRight(s.cfg.Endpoint, "/")
 	// Encode each path segment individually to preserve forward slashes
 	segments := strings.Split(key, "/")
 	for i, seg := range segments {
 		segments[i] = url.PathEscape(seg)
 	}
-	return fmt.Sprintf("%s/%s/%s", endpoint, s.bucket, strings.Join(segments, "/"))
+	encodedKey := strings.Join(segments, "/")
+
+	// Use public URL if configured (e.g. R2 dev URL)
+	if s.cfg.PublicURL != "" {
+		return fmt.Sprintf("%s/%s", strings.TrimRight(s.cfg.PublicURL, "/"), encodedKey)
+	}
+
+	// Fallback: S3 API endpoint + bucket + key
+	endpoint := strings.TrimRight(s.cfg.Endpoint, "/")
+	return fmt.Sprintf("%s/%s/%s", endpoint, s.bucket, encodedKey)
 }
 
 // GetSignedURL returns a pre-signed URL valid for the given duration.
