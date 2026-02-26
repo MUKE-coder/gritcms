@@ -5,8 +5,8 @@ services:
       dockerfile: Dockerfile
     container_name: gritcms-api
     restart: unless-stopped
-    ports:
-      - "8080:8080"
+    expose:
+      - "8080"
     env_file:
       - .env
     environment:
@@ -44,8 +44,8 @@ services:
       dockerfile: apps/web/Dockerfile
     container_name: gritcms-web
     restart: unless-stopped
-    ports:
-      - "3000:3000"
+    expose:
+      - "3000"
     environment:
       NEXT_PUBLIC_API_URL: ${API_URL:-http://api:8080}
 
@@ -55,8 +55,8 @@ services:
       dockerfile: apps/admin/Dockerfile
     container_name: gritcms-admin
     restart: unless-stopped
-    ports:
-      - "3001:3000"
+    expose:
+      - "3000"
     environment:
       NEXT_PUBLIC_API_URL: ${API_URL:-http://api:8080}
 
