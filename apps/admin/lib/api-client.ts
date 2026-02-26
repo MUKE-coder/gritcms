@@ -15,44 +15,56 @@ apiClient.interceptors.request.use((config) => {
   return config;
 });
 
-/** Upload a file using fetch (bypasses Axios header issues with FormData). */
+/**
+ * Upload a file via presigned URL (browser uploads directly to storage).
+ * 1. POST /api/uploads/presign → get presigned PUT URL
+ * 2. XHR PUT to presigned URL (direct to R2/S3/MinIO)
+ * 3. POST /api/uploads/complete → record in DB
+ */
 export async function uploadFile(
   file: File,
-  endpoint = "/api/uploads",
+  _endpoint = "/api/uploads",
   onProgress?: (percent: number) => void
 ): Promise<{ data: Record<string, unknown>; message: string }> {
-  const token = Cookies.get("access_token");
-  const formData = new FormData();
-  formData.append("file", file);
+  // Step 1: Get presigned URL from backend
+  const { data: presignRes } = await apiClient.post("/api/uploads/presign", {
+    filename: file.name,
+    content_type: file.type,
+    file_size: file.size,
+  });
+  const { presigned_url, key, public_url } = presignRes.data as {
+    presigned_url: string;
+    key: string;
+    public_url: string;
+  };
 
-  // Use XMLHttpRequest for progress support
-  return new Promise((resolve, reject) => {
+  // Step 2: Upload directly to storage via XHR PUT
+  await new Promise<void>((resolve, reject) => {
     const xhr = new XMLHttpRequest();
-    xhr.open("POST", `${API_URL}${endpoint}`);
-    if (token) xhr.setRequestHeader("Authorization", `Bearer ${token}`);
-
     if (onProgress) {
       xhr.upload.onprogress = (e) => {
         if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100));
       };
     }
-
-    xhr.onload = () => {
-      try {
-        const body = JSON.parse(xhr.responseText);
-        if (xhr.status >= 200 && xhr.status < 300) {
-          resolve(body);
-        } else {
-          reject({ response: { data: body, status: xhr.status } });
-        }
-      } catch {
-        reject(new Error("Upload failed"));
-      }
-    };
-
+    xhr.onload = () =>
+      xhr.status >= 200 && xhr.status < 300
+        ? resolve()
+        : reject(new Error(`Storage upload failed: ${xhr.status}`));
     xhr.onerror = () => reject(new Error("Network error during upload"));
-    xhr.send(formData);
+    xhr.open("PUT", presigned_url);
+    xhr.setRequestHeader("Content-Type", file.type);
+    xhr.send(file);
   });
+
+  // Step 3: Record the upload in the database
+  const { data: completeRes } = await apiClient.post("/api/uploads/complete", {
+    key,
+    filename: file.name,
+    content_type: file.type,
+    size: file.size,
+  });
+
+  return completeRes;
 }
 
 let isRefreshing = false;

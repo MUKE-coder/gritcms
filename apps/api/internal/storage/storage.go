@@ -156,3 +156,17 @@ func (s *Storage) GetSignedURL(ctx context.Context, key string, duration time.Du
 	}
 	return result.URL, nil
 }
+
+// PresignPutURL generates a pre-signed PUT URL for direct browser upload.
+func (s *Storage) PresignPutURL(ctx context.Context, key, contentType string) (string, error) {
+	presigner := s3.NewPresignClient(s.client)
+	result, err := presigner.PresignPutObject(ctx, &s3.PutObjectInput{
+		Bucket:      aws.String(s.bucket),
+		Key:         aws.String(key),
+		ContentType: aws.String(contentType),
+	}, s3.WithPresignExpires(1*time.Hour))
+	if err != nil {
+		return "", fmt.Errorf("generating presigned PUT URL for %q: %w", key, err)
+	}
+	return result.URL, nil
+}
