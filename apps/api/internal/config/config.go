@@ -93,7 +93,7 @@ func Load() (*Config, error) {
 		ResendAPIKey: getEnv("RESEND_API_KEY", ""),
 		MailFrom:     getEnv("MAIL_FROM", "noreply@localhost"),
 
-		CORSOrigins: strings.Split(getEnv("CORS_ORIGINS", "http://localhost:3000,http://localhost:3001"), ","),
+		CORSOrigins: trimSlice(strings.Split(getEnv("CORS_ORIGINS", "http://localhost:3000,http://localhost:3001"), ",")),
 
 		GORMStudioEnabled:  getEnv("GORM_STUDIO_ENABLED", "true") == "true",
 		GORMStudioUsername: getEnv("GORM_STUDIO_USERNAME", "admin"),
@@ -186,4 +186,14 @@ func getEnv(key, fallback string) string {
 		return val
 	}
 	return fallback
+}
+
+func trimSlice(ss []string) []string {
+	out := make([]string, 0, len(ss))
+	for _, s := range ss {
+		if v := strings.TrimSpace(s); v != "" {
+			out = append(out, v)
+		}
+	}
+	return out
 }
