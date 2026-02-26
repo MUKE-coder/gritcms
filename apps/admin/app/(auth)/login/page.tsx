@@ -13,6 +13,18 @@ const inputClass =
 const errorInputClass =
   "w-full rounded-xl border border-[var(--danger)]/40 bg-[var(--danger)]/[0.04] px-4 py-3.5 text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--danger)]/60 focus:outline-none focus:ring-2 focus:ring-[var(--danger)]/20 transition-all duration-200 text-[15px]";
 
+function getErrorMessage(error: unknown): string {
+  const axiosErr = error as { response?: { data?: { error?: { code?: string; message?: string } }; status?: number }; message?: string };
+  const apiError = axiosErr?.response?.data?.error;
+  const status = axiosErr?.response?.status;
+
+  if (apiError?.message) return apiError.message;
+  if (status === 0 || !axiosErr?.response) return "Unable to connect to the server. Please check your internet connection.";
+  if (status === 500) return "Something went wrong on our end. Please try again later.";
+  if (status === 503) return "Service is temporarily unavailable. Please try again in a moment.";
+  return "An unexpected error occurred. Please try again.";
+}
+
 export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const { mutate: login, isPending, error: serverError } = useLogin();
@@ -122,9 +134,9 @@ export default function LoginPage() {
 
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
             {serverError && (
-              <div className="rounded-xl bg-[var(--danger)]/[0.08] border border-[var(--danger)]/20 px-4 py-3.5 text-sm text-[var(--danger)] flex items-center gap-2.5">
+              <div className="rounded-xl bg-[var(--danger)]/[0.08] border border-[var(--danger)]/20 px-4 py-3.5 text-sm text-[var(--danger)] flex items-start gap-2.5">
                 <svg
-                  className="h-4 w-4 shrink-0"
+                  className="h-4 w-4 shrink-0 mt-0.5"
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
@@ -136,13 +148,7 @@ export default function LoginPage() {
                     d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"
                   />
                 </svg>
-                {(
-                  serverError as unknown as {
-                    response?: {
-                      data?: { error?: { message?: string } };
-                    };
-                  }
-                )?.response?.data?.error?.message || "Invalid credentials"}
+                <span>{getErrorMessage(serverError)}</span>
               </div>
             )}
 

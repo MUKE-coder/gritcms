@@ -85,10 +85,11 @@ func (h *AuthHandler) Register(c *gin.Context) {
 	}
 
 	if err := h.DB.Create(&user).Error; err != nil {
+		log.Printf("[Auth] Failed to create user %s: %v", req.Email, err)
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": gin.H{
 				"code":    "INTERNAL_ERROR",
-				"message": "Failed to create user",
+				"message": "Unable to create your account right now. Please try again later.",
 			},
 		})
 		return
@@ -96,10 +97,11 @@ func (h *AuthHandler) Register(c *gin.Context) {
 
 	tokens, err := h.AuthService.GenerateTokenPair(user.ID, user.Email, user.Role)
 	if err != nil {
+		log.Printf("[Auth] Failed to generate tokens for user %s: %v", user.Email, err)
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": gin.H{
 				"code":    "TOKEN_ERROR",
-				"message": "Failed to generate tokens",
+				"message": "Account created but failed to sign in. Please try logging in.",
 			},
 		})
 		return
@@ -174,10 +176,11 @@ func (h *AuthHandler) Login(c *gin.Context) {
 
 	tokens, err := h.AuthService.GenerateTokenPair(user.ID, user.Email, user.Role)
 	if err != nil {
+		log.Printf("[Auth] Failed to generate tokens for user %s: %v", user.Email, err)
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": gin.H{
 				"code":    "TOKEN_ERROR",
-				"message": "Failed to generate tokens",
+				"message": "Unable to sign in right now. Please try again later.",
 			},
 		})
 		return

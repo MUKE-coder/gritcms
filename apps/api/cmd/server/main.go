@@ -21,6 +21,7 @@ import (
 	"gritcms/apps/api/internal/database"
 	"gritcms/apps/api/internal/jobs"
 	"gritcms/apps/api/internal/mail"
+	"gritcms/apps/api/internal/models"
 	"gritcms/apps/api/internal/routes"
 	"gritcms/apps/api/internal/storage"
 )
@@ -36,6 +37,12 @@ func main() {
 	db, err := database.Connect(cfg.DatabaseURL)
 	if err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
+	}
+
+	// Auto-migrate database tables
+	log.Println("Running database migrations...")
+	if err := models.Migrate(db); err != nil {
+		log.Fatalf("Failed to migrate database: %v", err)
 	}
 
 	// ── Phase 4 Services ─────────────────────────────────────────
