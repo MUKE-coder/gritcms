@@ -15,7 +15,7 @@ services:
       REDIS_URL: redis://redis:6379
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
       APP_URL: ${API_URL:-http://localhost:8080}
-      CORS_ORIGINS: ${WEB_URL:-http://localhost:3000},${ADMIN_URL:-http://localhost:3001}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://localhost:3001}
       STORAGE_DRIVER: ${STORAGE_DRIVER:-minio}
       MINIO_ENDPOINT: http://minio:9000
       MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-minioadmin}
