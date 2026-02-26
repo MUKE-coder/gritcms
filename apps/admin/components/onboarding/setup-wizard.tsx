@@ -138,11 +138,11 @@ export function SetupWizard() {
 
   const handleComplete = async () => {
     try {
-      // 1. Save site settings
-      await apiClient.put("/api/settings/general", {
+      // 1. Save site settings (must use "theme" group + key names matching settings page)
+      await apiClient.put("/api/settings/theme", {
         site_name: siteSettings.siteName,
-        site_description: siteSettings.siteTagline,
-        ...(siteSettings.logoUrl ? { site_logo: siteSettings.logoUrl } : {}),
+        site_tagline: siteSettings.siteTagline,
+        ...(siteSettings.logoUrl ? { logo_url: siteSettings.logoUrl } : {}),
       });
 
       // 2. Create email list if not skipped
