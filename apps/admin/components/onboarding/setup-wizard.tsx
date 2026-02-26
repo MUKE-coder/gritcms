@@ -12,6 +12,8 @@ import {
   Zap,
   ExternalLink,
   Loader2,
+  X,
+  Image as ImageIcon,
 } from "@/lib/icons";
 import { apiClient } from "@/lib/api-client";
 
@@ -298,8 +300,48 @@ function SiteSettingsStep({
   onNext: () => void;
   onPrev: () => void;
 }) {
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const update = (key: keyof SiteSettings, value: string) => {
     onChange({ ...settings, [key]: value });
+  };
+
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      setUploadError("Please select an image file");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setUploadError("Image must be smaller than 5MB");
+      return;
+    }
+
+    setUploading(true);
+    setUploadError(null);
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const { data } = await apiClient.post("/api/uploads", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      update("logoUrl", data.data?.url || data.data?.path || "");
+    } catch {
+      setUploadError("Failed to upload logo. You can add one later in Settings.");
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
+  const removeLogo = () => {
+    update("logoUrl", "");
+    setUploadError(null);
   };
 
   const canContinue = settings.siteName.trim().length > 0;
@@ -344,19 +386,76 @@ function SiteSettingsStep({
           />
         </div>
 
-        {/* Logo URL */}
+        {/* Logo Upload */}
         <div className="space-y-1.5">
           <label className="block text-sm font-medium text-foreground">
-            Logo URL{" "}
+            Logo{" "}
             <span className="text-text-muted font-normal">(optional)</span>
           </label>
           <input
-            type="text"
-            value={settings.logoUrl}
-            onChange={(e) => update("logoUrl", e.target.value)}
-            placeholder="https://example.com/logo.png"
-            className="w-full rounded-lg border border-border bg-bg-tertiary px-4 py-2.5 text-sm text-foreground placeholder:text-text-muted focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+            ref={fileInputRef}
+            type="file"
+            accept="image/jpeg,image/jpg,image/png,image/gif,image/webp,image/svg+xml"
+            onChange={handleLogoUpload}
+            className="hidden"
           />
+
+          {settings.logoUrl ? (
+            <div className="flex items-center gap-3 rounded-lg border border-border bg-bg-tertiary px-4 py-3">
+              <img
+                src={settings.logoUrl}
+                alt="Logo"
+                className="h-10 w-10 rounded-lg object-contain border border-border bg-white/5"
+              />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-foreground truncate">Logo uploaded</p>
+                <p className="text-xs text-text-muted">Click to replace</p>
+              </div>
+              <button
+                type="button"
+                onClick={removeLogo}
+                className="rounded-lg p-1.5 text-text-muted hover:text-danger hover:bg-danger/10 transition-colors"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading}
+              className={`w-full flex items-center gap-3 rounded-lg border-2 border-dashed px-4 py-4 cursor-pointer transition-all ${
+                uploading
+                  ? "border-border opacity-60 cursor-not-allowed"
+                  : "border-border hover:border-accent/50 hover:bg-bg-hover/30"
+              }`}
+            >
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-bg-tertiary shrink-0">
+                {uploading ? (
+                  <Loader2 className="h-5 w-5 animate-spin text-accent" />
+                ) : (
+                  <ImageIcon className="h-5 w-5 text-text-muted" />
+                )}
+              </div>
+              <div className="text-left">
+                <p className="text-sm font-medium text-foreground">
+                  {uploading ? "Uploading..." : "Upload your logo"}
+                </p>
+                <p className="text-xs text-text-muted">
+                  PNG, JPG, SVG or WebP (max 5MB)
+                </p>
+              </div>
+              {!uploading && (
+                <span className="ml-auto rounded-lg bg-accent/10 px-3 py-1.5 text-xs font-medium text-accent shrink-0">
+                  Browse
+                </span>
+              )}
+            </button>
+          )}
+
+          {uploadError && (
+            <p className="text-xs text-danger">{uploadError}</p>
+          )}
           <p className="text-xs text-text-muted">
             You can always change this later in Settings.
           </p>
@@ -373,10 +472,7 @@ function SiteSettingsStep({
             <img
               src={settings.logoUrl}
               alt="Logo preview"
-              className="h-10 w-10 rounded-lg object-cover border border-border"
-              onError={(e) => {
-                (e.target as HTMLImageElement).style.display = "none";
-              }}
+              className="h-10 w-10 rounded-lg object-contain border border-border bg-white/5"
             />
           ) : (
             <div className="h-10 w-10 rounded-lg bg-accent/10 flex items-center justify-center">
