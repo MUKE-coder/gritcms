@@ -146,6 +146,32 @@ export interface Subscription {
   price?: Price;
 }
 
+// --- Checkout ---
+
+export interface CheckoutRequest {
+  type: "product" | "course";
+  product_id?: number;
+  course_id?: number;
+  price_id?: number;
+  coupon_code?: string;
+}
+
+export interface CheckoutResponse {
+  client_secret: string;
+  order_id: number;
+  order_number: string;
+  amount: number;
+  currency: string;
+  publishable_key: string;
+}
+
+export interface CheckoutStatus {
+  order_id: number;
+  order_number: string;
+  status: string;
+  total: number;
+}
+
 // --- Revenue Dashboard ---
 
 export interface RevenueDashboard {

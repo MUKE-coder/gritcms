@@ -16,6 +16,7 @@ import (
 	"gritcms/apps/api/internal/cache"
 	"gritcms/apps/api/internal/config"
 	"gritcms/apps/api/internal/handlers"
+	"gritcms/apps/api/internal/integrations"
 	"gritcms/apps/api/internal/jobs"
 	"gritcms/apps/api/internal/mail"
 	"gritcms/apps/api/internal/middleware"
@@ -188,9 +189,11 @@ func Setup(db *gorm.DB, cfg *config.Config, svc *Services) *gin.Engine {
 	analyticsHandler := handlers.NewAnalyticsHandler(db)
 	communityHandler := handlers.NewCommunityHandler(db)
 	funnelHandler := handlers.NewFunnelHandler(db)
-	bookingHandler := handlers.NewBookingHandler(db)
+	meetingService := integrations.NewMeetingService(db, cfg)
+	bookingHandler := handlers.NewBookingHandler(db, meetingService, cfg)
 	affiliateHandler := handlers.NewAffiliateHandler(db)
 	workflowHandler := handlers.NewWorkflowHandler(db)
+	paymentHandler := handlers.NewPaymentHandler(db, cfg)
 	// grit:handlers
 
 	// Health check
@@ -258,6 +261,15 @@ func Setup(db *gorm.DB, cfg *config.Config, svc *Services) *gin.Engine {
 	r.GET("/api/book/:slug/slots", bookingHandler.GetAvailableSlots)
 	r.POST("/api/book/:slug", bookingHandler.BookAppointment)
 
+	// Google Calendar OAuth callback (public — Google redirects here)
+	r.GET("/api/integrations/google/callback", bookingHandler.GoogleCallback)
+
+	// Stripe webhook (public, no auth — Stripe sends events here)
+	r.POST("/api/webhooks/stripe", paymentHandler.StripeWebhook)
+
+	// Public Stripe config (publishable key)
+	r.GET("/api/p/stripe/config", paymentHandler.StripeConfig)
+
 	// Public affiliate routes
 	r.GET("/api/ref/:code", affiliateHandler.TrackReferral)
 
@@ -309,6 +321,10 @@ func Setup(db *gorm.DB, cfg *config.Config, svc *Services) *gin.Engine {
 			student.POST("/courses/:id/enroll", courseHandler.StudentEnroll)
 			student.POST("/courses/:id/lessons/:lessonId/complete", courseHandler.StudentMarkLessonComplete)
 		}
+
+		// Checkout (any authenticated user)
+		protected.POST("/checkout", paymentHandler.Checkout)
+		protected.GET("/checkout/:orderId/status", paymentHandler.CheckoutStatus)
 
 		// grit:routes:protected
 	}
@@ -639,6 +655,12 @@ func Setup(db *gorm.DB, cfg *config.Config, svc *Services) *gin.Engine {
 		admin.POST("/booking/appointments/:appointmentId/cancel", bookingHandler.CancelAppointment)
 		admin.POST("/booking/appointments/:appointmentId/complete", bookingHandler.CompleteAppointment)
 		admin.POST("/booking/appointments/:appointmentId/reschedule", bookingHandler.RescheduleAppointment)
+
+		// Integrations (admin)
+		admin.GET("/integrations/google/auth-url", bookingHandler.GoogleAuthURL)
+		admin.GET("/integrations/google/status", bookingHandler.GoogleStatus)
+		admin.POST("/integrations/google/disconnect", bookingHandler.GoogleDisconnect)
+		admin.GET("/integrations/zoom/status", bookingHandler.ZoomStatus)
 
 		// Affiliate programs (admin)
 		admin.GET("/affiliates/programs", affiliateHandler.ListPrograms)

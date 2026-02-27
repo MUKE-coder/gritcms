@@ -15,6 +15,9 @@ import {
   Clock,
   CalendarCheck,
   Settings,
+  Share2,
+  Copy,
+  Check,
 } from "@/lib/icons";
 import {
   useCalendar,
@@ -106,6 +109,103 @@ function formatPrice(cents: number) {
 }
 
 // ---------------------------------------------------------------------------
+// Share Links
+// ---------------------------------------------------------------------------
+
+const WEB_URL = process.env.NEXT_PUBLIC_WEB_URL || "";
+
+const SOURCES = [
+  { key: "instagram", label: "Instagram" },
+  { key: "twitter", label: "Twitter / X" },
+  { key: "facebook", label: "Facebook" },
+  { key: "youtube", label: "YouTube" },
+  { key: "linkedin", label: "LinkedIn" },
+  { key: "tiktok", label: "TikTok" },
+];
+
+function BookingShareLinksModal({
+  slug,
+  eventTypeName,
+  onClose,
+}: {
+  slug: string;
+  eventTypeName: string;
+  onClose: () => void;
+}) {
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
+  const [customSource, setCustomSource] = useState("");
+
+  function buildUrl(source: string) {
+    return `${WEB_URL}/book/${slug}${source ? `?source=${source}` : ""}`;
+  }
+
+  function handleCopy(key: string, url: string) {
+    navigator.clipboard.writeText(url);
+    setCopiedKey(key);
+    setTimeout(() => setCopiedKey(null), 2000);
+  }
+
+  const allSources = [
+    { key: "direct", label: "Direct Link" },
+    ...SOURCES,
+    ...(customSource.trim()
+      ? [{ key: customSource.trim().toLowerCase().replace(/\s+/g, "-"), label: customSource.trim() }]
+      : []),
+  ];
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+      <div className="w-full max-w-lg rounded-xl border border-border bg-bg-elevated shadow-2xl mx-4 max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+          <div>
+            <h2 className="text-lg font-semibold text-foreground">Share Booking Link</h2>
+            <p className="text-sm text-text-muted mt-0.5">{eventTypeName}</p>
+          </div>
+          <button onClick={onClose} className="p-1 text-text-muted hover:text-foreground transition-colors">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        <div className="p-5 space-y-3">
+          {allSources.map((src) => {
+            const url = buildUrl(src.key === "direct" ? "" : src.key);
+            const isCopied = copiedKey === src.key;
+            return (
+              <div key={src.key} className="flex items-center gap-3 rounded-lg border border-border bg-bg-secondary px-3 py-2.5">
+                <span className="text-sm font-medium text-text-secondary w-24 shrink-0">{src.label}</span>
+                <span className="flex-1 text-xs text-text-muted truncate">{url}</span>
+                <button
+                  onClick={() => handleCopy(src.key, url)}
+                  className={`shrink-0 rounded-md p-1.5 transition-colors ${
+                    isCopied
+                      ? "bg-green-500/10 text-green-400"
+                      : "text-text-muted hover:bg-bg-hover hover:text-foreground"
+                  }`}
+                  title="Copy"
+                >
+                  {isCopied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                </button>
+              </div>
+            );
+          })}
+
+          <div className="pt-2">
+            <label className="block text-xs font-medium text-text-muted mb-1.5">Custom source tag</label>
+            <input
+              type="text"
+              value={customSource}
+              onChange={(e) => setCustomSource(e.target.value)}
+              placeholder="e.g. newsletter, podcast"
+              className="w-full rounded-lg border border-border bg-bg-secondary px-3 py-2 text-sm text-foreground focus:border-accent focus:outline-none"
+            />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Main Component
 // ---------------------------------------------------------------------------
 
@@ -127,6 +227,10 @@ export default function CalendarDetailPage() {
 
   // Tab state
   const [activeTab, setActiveTab] = useState<Tab>("event-types");
+
+  // ---- Share Links state ----
+  const [shareSlug, setShareSlug] = useState<string | null>(null);
+  const [shareName, setShareName] = useState("");
 
   // ---- Event Types state ----
   const [showEventTypeModal, setShowEventTypeModal] = useState(false);
@@ -443,6 +547,16 @@ export default function CalendarDetailPage() {
                       </div>
                     </div>
                     <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button
+                        onClick={() => {
+                          setShareSlug(et.slug);
+                          setShareName(et.name);
+                        }}
+                        className="rounded-lg p-1.5 text-text-muted hover:bg-accent/10 hover:text-accent transition-colors"
+                        title="Share"
+                      >
+                        <Share2 className="h-3.5 w-3.5" />
+                      </button>
                       <button
                         onClick={() => openEditEventType(et)}
                         className="rounded-lg p-1.5 text-text-muted hover:bg-bg-hover hover:text-foreground transition-colors"
@@ -898,6 +1012,15 @@ export default function CalendarDetailPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Share Links Modal */}
+      {shareSlug && (
+        <BookingShareLinksModal
+          slug={shareSlug}
+          eventTypeName={shareName}
+          onClose={() => setShareSlug(null)}
+        />
       )}
     </div>
   );

@@ -74,9 +74,11 @@ type Appointment struct {
 	EndAt       time.Time `gorm:"not null" json:"end_at"`
 	Status      string    `gorm:"size:20;default:'confirmed'" json:"status"`
 	Notes       string    `gorm:"type:text" json:"notes"`
-	MeetingURL  string    `gorm:"size:500" json:"meeting_url"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	MeetingURL    string    `gorm:"size:500" json:"meeting_url"`
+	GoogleEventID string    `gorm:"size:255" json:"google_event_id"`
+	ZoomMeetingID string    `gorm:"size:255" json:"zoom_meeting_id"`
+	CreatedAt     time.Time `json:"created_at"`
+	UpdatedAt     time.Time `json:"updated_at"`
 
 	EventType *BookingEventType `gorm:"foreignKey:EventTypeID" json:"event_type,omitempty"`
 	Contact   *Contact          `gorm:"foreignKey:ContactID" json:"contact,omitempty"`

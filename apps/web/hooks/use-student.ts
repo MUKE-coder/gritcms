@@ -1,6 +1,7 @@
 "use client";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { api } from "@/lib/api";
 import type { Course, CourseEnrollment, LessonProgress } from "@repo/shared/types";
 
@@ -38,9 +39,13 @@ export function useEnrollCourse() {
       const { data } = await api.post(`/api/student/courses/${courseId}/enroll`);
       return data.data as CourseEnrollment;
     },
-    onSuccess: () => {
+    onSuccess: (_data, courseId) => {
       qc.invalidateQueries({ queryKey: ["student-courses"] });
-      qc.invalidateQueries({ queryKey: ["student-course"] });
+      qc.invalidateQueries({ queryKey: ["student-course", courseId] });
+      toast.success("Enrolled successfully!");
+    },
+    onError: () => {
+      toast.error("Failed to enroll. Please try again.");
     },
   });
 }

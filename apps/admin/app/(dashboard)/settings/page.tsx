@@ -11,8 +11,19 @@ import {
   Type,
   Save,
   Check,
+  Plug,
+  Video,
+  Calendar,
+  ExternalLink,
+  Unplug,
 } from "@/lib/icons";
 import { Dropzone, type UploadedFile } from "@/components/ui/dropzone";
+import {
+  useGoogleAuthUrl,
+  useGoogleStatus,
+  useDisconnectGoogle,
+  useZoomStatus,
+} from "@/hooks/use-integrations";
 
 /* ─── Google Fonts list (popular subset) ──────────────────────── */
 const GOOGLE_FONTS = [
@@ -63,6 +74,7 @@ const tabs = [
   { id: "branding", label: "Branding", icon: Palette },
   { id: "social", label: "Social", icon: Share2 },
   { id: "seo", label: "SEO", icon: Search },
+  { id: "integrations", label: "Integrations", icon: Plug },
 ];
 
 /* ─── Input component ──────────────────────────────────────────── */
@@ -105,11 +117,13 @@ export default function SettingsPage() {
   // Load settings from separate groups
   const { data: themeData, isLoading: themeLoading } = useSettings("theme");
   const { data: seoData, isLoading: seoLoading } = useSettings("seo");
+  const { data: intData, isLoading: intLoading } = useSettings("integrations");
   const { mutate: save, isPending: saving } = useUpdateSettings();
 
   // Local form state
   const [theme, setTheme] = useState<Record<string, string>>({});
   const [seo, setSeo] = useState<Record<string, string>>({});
+  const [integrations, setIntegrations] = useState<Record<string, string>>({});
 
   // Seed local state once fetched
   useEffect(() => {
@@ -120,20 +134,28 @@ export default function SettingsPage() {
     if (seoData) setSeo(seoData);
   }, [seoData]);
 
+  useEffect(() => {
+    if (intData) setIntegrations(intData);
+  }, [intData]);
+
   const updateTheme = (key: string, value: string) =>
     setTheme((prev) => ({ ...prev, [key]: value }));
   const updateSeo = (key: string, value: string) =>
     setSeo((prev) => ({ ...prev, [key]: value }));
+  const updateInt = (key: string, value: string) =>
+    setIntegrations((prev) => ({ ...prev, [key]: value }));
 
   const handleSave = () => {
     if (activeTab === "seo") {
       save({ group: "seo", settings: seo });
+    } else if (activeTab === "integrations") {
+      save({ group: "integrations", settings: integrations });
     } else {
       save({ group: "theme", settings: theme });
     }
   };
 
-  const isLoading = themeLoading || seoLoading;
+  const isLoading = themeLoading || seoLoading || intLoading;
 
   if (isLoading) {
     return (
@@ -202,6 +224,9 @@ export default function SettingsPage() {
           <SocialTab theme={theme} onChange={updateTheme} />
         )}
         {activeTab === "seo" && <SeoTab seo={seo} onChange={updateSeo} />}
+        {activeTab === "integrations" && (
+          <IntegrationsTab integrations={integrations} onChange={updateInt} />
+        )}
       </div>
     </div>
   );
@@ -536,6 +561,211 @@ function SeoTab({
         placeholder="G-XXXXXXXXXX"
         hint="Your Google Analytics 4 measurement ID."
       />
+    </div>
+  );
+}
+
+/* ─── Integrations Tab ────────────────────────────────────────── */
+function IntegrationsTab({
+  integrations,
+  onChange,
+}: {
+  integrations: Record<string, string>;
+  onChange: (k: string, v: string) => void;
+}) {
+  const { data: googleStatus } = useGoogleStatus();
+  const { refetch: fetchAuthUrl } = useGoogleAuthUrl();
+  const { mutate: disconnectGoogle, isPending: disconnecting } = useDisconnectGoogle();
+  const { data: zoomStatus } = useZoomStatus();
+
+  const meetingProvider = integrations.meeting_provider || "none";
+  const googleConnected = googleStatus?.connected ?? false;
+  const zoomConnected = zoomStatus?.connected ?? false;
+
+  const handleConnectGoogle = async () => {
+    const result = await fetchAuthUrl();
+    if (result.data?.url) {
+      window.open(result.data.url, "_blank", "width=600,height=700");
+    }
+  };
+
+  return (
+    <div className="space-y-10 max-w-2xl">
+      {/* ── Google Calendar ── */}
+      <div className="space-y-4">
+        <div className="flex items-center gap-2">
+          <Calendar className="h-4 w-4 text-accent" />
+          <h2 className="text-lg font-semibold text-foreground">
+            Google Calendar
+          </h2>
+        </div>
+        <p className="text-sm text-text-secondary">
+          Sync your bookings to Google Calendar. When connected, new
+          appointments will automatically appear on your calendar.
+        </p>
+
+        <div className="flex items-center gap-4 rounded-lg border border-border bg-bg-tertiary p-4">
+          <div
+            className={`flex h-10 w-10 items-center justify-center rounded-full ${
+              googleConnected
+                ? "bg-emerald-500/10 text-emerald-500"
+                : "bg-bg-hover text-text-muted"
+            }`}
+          >
+            <Calendar className="h-5 w-5" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-foreground">
+              {googleConnected ? "Connected" : "Not Connected"}
+            </p>
+            <p className="text-xs text-text-muted">
+              {googleConnected
+                ? "Your bookings are syncing to Google Calendar"
+                : "Connect your Google account to enable calendar sync"}
+            </p>
+          </div>
+          {googleConnected ? (
+            <button
+              onClick={() => disconnectGoogle()}
+              disabled={disconnecting}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-xs font-medium text-text-secondary hover:bg-bg-hover hover:text-foreground transition-colors disabled:opacity-50"
+            >
+              <Unplug className="h-3.5 w-3.5" />
+              {disconnecting ? "Disconnecting..." : "Disconnect"}
+            </button>
+          ) : (
+            <button
+              onClick={handleConnectGoogle}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-2 text-xs font-semibold text-white hover:bg-accent-hover transition-colors"
+            >
+              <ExternalLink className="h-3.5 w-3.5" />
+              Connect
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* ── Meeting Provider ── */}
+      <div className="space-y-4">
+        <div className="flex items-center gap-2">
+          <Video className="h-4 w-4 text-accent" />
+          <h2 className="text-lg font-semibold text-foreground">
+            Meeting Provider
+          </h2>
+        </div>
+        <p className="text-sm text-text-secondary">
+          Choose how meeting links are generated when someone books an
+          appointment.
+        </p>
+
+        <div className="space-y-2">
+          {[
+            {
+              id: "none",
+              label: "None",
+              desc: "No meeting link — use for in-person or manual meetings",
+            },
+            {
+              id: "google_meet",
+              label: "Google Meet",
+              desc: "Auto-create Google Meet links (requires Google Calendar connection)",
+            },
+            {
+              id: "zoom",
+              label: "Zoom",
+              desc: "Auto-create Zoom meetings via Server-to-Server OAuth",
+            },
+          ].map((opt) => (
+            <label
+              key={opt.id}
+              className={`flex items-start gap-3 rounded-lg border p-4 cursor-pointer transition-all ${
+                meetingProvider === opt.id
+                  ? "border-accent bg-accent/5"
+                  : "border-border bg-bg-tertiary hover:bg-bg-hover"
+              }`}
+            >
+              <input
+                type="radio"
+                name="meeting_provider"
+                checked={meetingProvider === opt.id}
+                onChange={() => onChange("meeting_provider", opt.id)}
+                className="mt-0.5 h-4 w-4 accent-[var(--accent)]"
+              />
+              <div>
+                <span className="text-sm font-medium text-foreground">
+                  {opt.label}
+                </span>
+                <p className="text-xs text-text-muted mt-0.5">{opt.desc}</p>
+              </div>
+            </label>
+          ))}
+        </div>
+
+        {meetingProvider === "google_meet" && !googleConnected && (
+          <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
+            <p className="text-xs text-amber-600 dark:text-amber-400">
+              Google Meet requires a connected Google Calendar account. Please
+              connect your Google account above.
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* ── Zoom Credentials ── */}
+      <div className="space-y-4">
+        <div className="flex items-center gap-2">
+          <Video className="h-4 w-4 text-accent" />
+          <h2 className="text-lg font-semibold text-foreground">
+            Zoom
+          </h2>
+          <span
+            className={`ml-auto inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${
+              zoomConnected
+                ? "bg-emerald-500/10 text-emerald-500"
+                : "bg-bg-hover text-text-muted"
+            }`}
+          >
+            {zoomConnected ? "Connected" : "Not Connected"}
+          </span>
+        </div>
+        <p className="text-sm text-text-secondary">
+          Configure Zoom Server-to-Server OAuth credentials to auto-create
+          meetings.{" "}
+          <a
+            href="https://marketplace.zoom.us/develop/create"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-accent hover:underline"
+          >
+            Create app on Zoom Marketplace
+          </a>
+        </p>
+
+        <Input
+          label="Account ID"
+          value={integrations.zoom_account_id || ""}
+          onChange={(v) => onChange("zoom_account_id", v)}
+          placeholder="Your Zoom Account ID"
+        />
+        <Input
+          label="Client ID"
+          value={integrations.zoom_client_id || ""}
+          onChange={(v) => onChange("zoom_client_id", v)}
+          placeholder="Your Zoom S2S Client ID"
+        />
+        <Input
+          label="Client Secret"
+          value={integrations.zoom_client_secret || ""}
+          onChange={(v) => onChange("zoom_client_secret", v)}
+          placeholder="Your Zoom S2S Client Secret"
+          type="password"
+        />
+        <p className="text-xs text-text-muted">
+          Credentials are stored securely. Environment variables
+          (ZOOM_ACCOUNT_ID, ZOOM_CLIENT_ID, ZOOM_CLIENT_SECRET) take
+          precedence if set.
+        </p>
+      </div>
     </div>
   );
 }

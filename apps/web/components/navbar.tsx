@@ -16,6 +16,7 @@ const defaultLinks: { href: string; label: string; target?: string }[] = [
   { href: "/courses", label: "Courses" },
   { href: "/products", label: "Products" },
   { href: "/community", label: "Community" },
+  { href: "/book", label: "Booking" },
   { href: "/blog", label: "Blog" },
 ];
 

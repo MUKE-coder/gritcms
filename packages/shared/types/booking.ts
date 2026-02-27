@@ -53,6 +53,8 @@ export interface Appointment {
   status: AppointmentStatus;
   notes: string;
   meeting_url: string;
+  google_event_id: string;
+  zoom_meeting_id: string;
   created_at: string;
   updated_at: string;
   event_type?: BookingEventType;

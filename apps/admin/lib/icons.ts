@@ -105,6 +105,8 @@ import {
   PanelRightOpen,
   Link2,
   Copy,
+  Plug,
+  Unplug,
   Type as TypeIcon,
   type LucideIcon,
 } from "lucide-react";
@@ -280,4 +282,6 @@ export {
   PanelRightOpen,
   Link2,
   Copy,
+  Plug,
+  Unplug,
 };

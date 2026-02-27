@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"fmt"
+	"log"
 	"math"
 	"net/http"
 	"strconv"
@@ -10,16 +11,20 @@ import (
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 
+	"gritcms/apps/api/internal/config"
 	"gritcms/apps/api/internal/events"
+	"gritcms/apps/api/internal/integrations"
 	"gritcms/apps/api/internal/models"
 )
 
 type BookingHandler struct {
-	DB *gorm.DB
+	DB       *gorm.DB
+	Meetings *integrations.MeetingService
+	Cfg      *config.Config
 }
 
-func NewBookingHandler(db *gorm.DB) *BookingHandler {
-	return &BookingHandler{DB: db}
+func NewBookingHandler(db *gorm.DB, meetings *integrations.MeetingService, cfg *config.Config) *BookingHandler {
+	return &BookingHandler{DB: db, Meetings: meetings, Cfg: cfg}
 }
 
 // ---------- Calendars ----------
@@ -218,6 +223,13 @@ func (h *BookingHandler) CancelAppointment(c *gin.Context) {
 	}
 	h.DB.Model(&appt).Update("status", models.AppointmentCancelled)
 
+	// Cancel external meetings (non-blocking)
+	if h.Meetings != nil {
+		if err := h.Meetings.CancelMeetingForAppointment(&appt); err != nil {
+			log.Printf("[booking] Failed to cancel external meeting: %v", err)
+		}
+	}
+
 	events.Emit(events.BookingCancelled, map[string]interface{}{
 		"appointment_id": appt.ID, "contact_id": appt.ContactID,
 	})
@@ -266,6 +278,16 @@ func (h *BookingHandler) RescheduleAppointment(c *gin.Context) {
 		"end_at":   newEnd,
 		"status":   models.AppointmentConfirmed,
 	})
+	appt.StartAt = newStart
+	appt.EndAt = newEnd
+	appt.EventType = &et
+
+	// Update external meetings (non-blocking)
+	if h.Meetings != nil {
+		if err := h.Meetings.UpdateMeetingForAppointment(&appt); err != nil {
+			log.Printf("[booking] Failed to update external meeting: %v", err)
+		}
+	}
 
 	events.Emit(events.BookingRescheduled, map[string]interface{}{
 		"appointment_id": appt.ID, "contact_id": appt.ContactID,
@@ -457,11 +479,84 @@ func (h *BookingHandler) BookAppointment(c *gin.Context) {
 		return
 	}
 
+	// Create external meetings (non-blocking — never fail the booking)
+	if h.Meetings != nil {
+		meetingURL, mErr := h.Meetings.CreateMeetingForAppointment(&appt, et, contact)
+		if mErr != nil {
+			log.Printf("[booking] Failed to create meeting: %v", mErr)
+		} else if meetingURL != "" {
+			h.DB.Model(&appt).Updates(map[string]interface{}{
+				"meeting_url":     meetingURL,
+				"google_event_id": appt.GoogleEventID,
+				"zoom_meeting_id": appt.ZoomMeetingID,
+			})
+			appt.MeetingURL = meetingURL
+		}
+	}
+
 	events.Emit(events.BookingConfirmed, map[string]interface{}{
 		"appointment_id": appt.ID, "contact_id": contact.ID, "event_type": et.Name,
 	})
 
 	c.JSON(http.StatusCreated, gin.H{"data": appt})
+}
+
+// ---------- Integration Endpoints ----------
+
+// GoogleAuthURL returns the Google OAuth authorization URL.
+func (h *BookingHandler) GoogleAuthURL(c *gin.Context) {
+	if h.Meetings == nil || h.Cfg.GoogleClientID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Google OAuth not configured"})
+		return
+	}
+	url := h.Meetings.Google.GetAuthURL("gritcms-gcal")
+	c.JSON(http.StatusOK, gin.H{"data": gin.H{"url": url}})
+}
+
+// GoogleCallback handles the OAuth2 callback from Google.
+func (h *BookingHandler) GoogleCallback(c *gin.Context) {
+	code := c.Query("code")
+	if code == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "No authorization code"})
+		return
+	}
+	if h.Meetings == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Integrations not configured"})
+		return
+	}
+	if err := h.Meetings.Google.HandleCallback(code); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	// Redirect to admin settings
+	redirectURL := h.Cfg.OAuthFrontendURL + "/settings?tab=integrations&google=connected"
+	c.Redirect(http.StatusFound, redirectURL)
+}
+
+// GoogleStatus returns whether Google Calendar is connected.
+func (h *BookingHandler) GoogleStatus(c *gin.Context) {
+	connected := false
+	if h.Meetings != nil {
+		connected = h.Meetings.Google.IsConnected()
+	}
+	c.JSON(http.StatusOK, gin.H{"data": gin.H{"connected": connected}})
+}
+
+// GoogleDisconnect removes the stored Google Calendar tokens.
+func (h *BookingHandler) GoogleDisconnect(c *gin.Context) {
+	if h.Meetings != nil {
+		h.Meetings.Google.Disconnect()
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "Google Calendar disconnected"})
+}
+
+// ZoomStatus returns whether Zoom is configured.
+func (h *BookingHandler) ZoomStatus(c *gin.Context) {
+	connected := false
+	if h.Meetings != nil {
+		connected = h.Meetings.Zoom.IsConfigured()
+	}
+	c.JSON(http.StatusOK, gin.H{"data": gin.H{"connected": connected}})
 }
 
 // ---------- Helpers ----------

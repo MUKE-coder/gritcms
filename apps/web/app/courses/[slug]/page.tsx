@@ -1,6 +1,6 @@
 "use client";
 
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   ArrowLeft,
@@ -18,11 +18,15 @@ import {
   Lock,
   Eye,
 } from "lucide-react";
+import { toast } from "sonner";
 import { usePublicCourse } from "@/hooks/use-courses";
 import { useAuth } from "@/hooks/use-auth";
 import { useEnrollCourse, useStudentCourse } from "@/hooks/use-student";
+import { useCreateCheckout } from "@/hooks/use-checkout";
+import { StripeProvider } from "@/components/stripe-provider";
+import { CheckoutForm } from "@/components/checkout-form";
 import { LessonPreviewModal } from "@/components/lesson-preview-modal";
-import type { Lesson } from "@repo/shared/types";
+import type { Lesson, CheckoutResponse } from "@repo/shared/types";
 import { useState } from "react";
 
 const lessonIcons: Record<string, typeof Play> = {
@@ -45,10 +49,13 @@ export default function CourseDetailPage() {
   const slug = typeof params.slug === "string" ? params.slug : "";
   const { data: course, isLoading, error } = usePublicCourse(slug);
   const { user, isAuthenticated } = useAuth();
-  const { data: studentCourse } = useStudentCourse(course?.id ?? 0);
+  const { data: studentCourse } = useStudentCourse(isAuthenticated ? (course?.id ?? 0) : 0);
+  const router = useRouter();
   const { mutate: enroll, isPending: enrolling } = useEnrollCourse();
+  const { mutate: createCheckout, isPending: checkingOut } = useCreateCheckout();
   const [expandedModules, setExpandedModules] = useState<Set<number>>(new Set());
   const [previewLesson, setPreviewLesson] = useState<Lesson | null>(null);
+  const [checkoutData, setCheckoutData] = useState<CheckoutResponse | null>(null);
 
   const isEnrolled = !!studentCourse?.enrollment;
 
@@ -73,7 +80,21 @@ export default function CourseDetailPage() {
       window.location.href = `/auth/login?redirect=/courses/${slug}`;
       return;
     }
-    enroll(course.id);
+
+    if (course.access_type === "paid" && course.product_id) {
+      createCheckout(
+        {
+          type: "course",
+          course_id: course.id,
+          price_id: 0,
+        },
+        {
+          onSuccess: (data) => setCheckoutData(data),
+        }
+      );
+    } else {
+      enroll(course.id);
+    }
   }
 
   if (isLoading) {
@@ -236,7 +257,26 @@ export default function CourseDetailPage() {
 
           {/* Enroll / Continue CTA */}
           <div className="rounded-xl border border-border bg-bg-elevated p-5 space-y-3">
-            {isEnrolled ? (
+            {checkoutData ? (
+              <StripeProvider
+                clientSecret={checkoutData.client_secret}
+                publishableKey={checkoutData.publishable_key}
+              >
+                <CheckoutForm
+                  amount={checkoutData.amount}
+                  currency={checkoutData.currency}
+                  orderId={checkoutData.order_id}
+                  onSuccess={() => {
+                    toast.success("Payment successful! Enrolling...");
+                    router.push(`/learn/${course.slug}`);
+                  }}
+                  onError={(msg) => {
+                    toast.error(msg);
+                    setCheckoutData(null);
+                  }}
+                />
+              </StripeProvider>
+            ) : isEnrolled ? (
               <Link
                 href={`/learn/${course.slug}`}
                 className="block w-full rounded-lg bg-accent px-4 py-3 text-center text-sm font-semibold text-white hover:bg-accent-hover transition-colors"
@@ -246,18 +286,24 @@ export default function CourseDetailPage() {
             ) : (
               <button
                 onClick={handleEnroll}
-                disabled={enrolling}
+                disabled={enrolling || checkingOut}
                 className="w-full rounded-lg bg-accent px-4 py-3 text-sm font-semibold text-white hover:bg-accent-hover disabled:opacity-50 transition-colors"
               >
-                {enrolling ? "Enrolling..." : course.access_type === "free" ? "Enroll for Free" : "Enroll Now"}
+                {checkingOut
+                  ? "Preparing checkout..."
+                  : enrolling
+                    ? "Enrolling..."
+                    : course.access_type === "free"
+                      ? "Enroll for Free"
+                      : "Enroll Now"}
               </button>
             )}
-            {!isAuthenticated && (
+            {!isAuthenticated && !checkoutData && (
               <p className="text-xs text-text-muted text-center">
                 You&apos;ll need to create an account to enroll.
               </p>
             )}
-            {course.access_type === "paid" && !isEnrolled && (
+            {course.access_type === "paid" && !isEnrolled && !checkoutData && (
               <p className="text-xs text-text-muted text-center">
                 {new Intl.NumberFormat("en-US", {
                   style: "currency",

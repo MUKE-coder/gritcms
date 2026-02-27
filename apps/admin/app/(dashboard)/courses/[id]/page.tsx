@@ -35,7 +35,11 @@ import {
   useCreateLesson,
   useUpdateLesson,
   useDeleteLesson,
+  useCourseEnrollments,
+  useEnrollInCourse,
+  useUnenrollContact,
 } from "@/hooks/use-courses";
+import { useContacts } from "@/hooks/use-contacts";
 import type { CourseModule, Lesson } from "@repo/shared/types";
 
 // ---------------------------------------------------------------------------
@@ -776,31 +780,7 @@ export default function CourseEditorPage() {
       {/* TAB 3: STUDENTS                                                   */}
       {/* ================================================================= */}
       {activeTab === "students" && (
-        <div className="space-y-6">
-          <div className="rounded-xl border border-border bg-bg-secondary p-6">
-            <div className="flex items-center gap-4 mb-6">
-              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-accent/10">
-                <Users className="h-6 w-6 text-accent" />
-              </div>
-              <div>
-                <h2 className="text-lg font-semibold text-foreground">Student Enrollments</h2>
-                <p className="text-sm text-text-muted">
-                  {course.enrollment_count ?? analytics?.total_enrollments ?? 0} student{(course.enrollment_count ?? analytics?.total_enrollments ?? 0) !== 1 ? "s" : ""} enrolled
-                </p>
-              </div>
-            </div>
-
-            <div className="rounded-lg border border-border/50 bg-bg-elevated p-8 text-center">
-              <Users className="h-10 w-10 text-text-muted mx-auto mb-3" />
-              <p className="text-sm text-text-secondary mb-1">
-                Manage enrollments from the Enrollments section.
-              </p>
-              <p className="text-xs text-text-muted">
-                Use the main Enrollments page to add, remove, or manage student access for this course.
-              </p>
-            </div>
-          </div>
-        </div>
+        <StudentsTab courseId={course.id} enrollmentCount={course.enrollment_count ?? analytics?.total_enrollments ?? 0} />
       )}
 
       {/* ================================================================= */}
@@ -974,6 +954,293 @@ export default function CourseEditorPage() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+/* ================================================================= */
+/* StudentsTab                                                        */
+/* ================================================================= */
+
+function StudentsTab({ courseId, enrollmentCount }: { courseId: number; enrollmentCount: number }) {
+  const [page, setPage] = useState(1);
+  const [showEnrollModal, setShowEnrollModal] = useState(false);
+  const [contactSearch, setContactSearch] = useState("");
+
+  const { data: enrollmentData, isLoading } = useCourseEnrollments({ courseId, page, pageSize: 20 });
+  const { mutate: enrollContact, isPending: enrollingContact } = useEnrollInCourse();
+  const { mutate: unenroll } = useUnenrollContact();
+
+  const enrollments = enrollmentData?.data ?? [];
+  const meta = enrollmentData?.meta;
+
+  return (
+    <div className="space-y-6">
+      <div className="rounded-xl border border-border bg-bg-secondary p-6">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-4">
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-accent/10">
+              <Users className="h-6 w-6 text-accent" />
+            </div>
+            <div>
+              <h2 className="text-lg font-semibold text-foreground">Student Enrollments</h2>
+              <p className="text-sm text-text-muted">
+                {meta?.total ?? enrollmentCount} student{(meta?.total ?? enrollmentCount) !== 1 ? "s" : ""} enrolled
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => setShowEnrollModal(true)}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-white hover:bg-accent-hover transition-colors"
+          >
+            <Plus className="h-4 w-4" />
+            Enroll Student
+          </button>
+        </div>
+
+        {/* Loading */}
+        {isLoading && (
+          <div className="flex justify-center py-12">
+            <Loader2 className="h-6 w-6 animate-spin text-accent" />
+          </div>
+        )}
+
+        {/* Empty state */}
+        {!isLoading && enrollments.length === 0 && (
+          <div className="rounded-lg border border-border/50 bg-bg-elevated p-8 text-center">
+            <Users className="h-10 w-10 text-text-muted mx-auto mb-3" />
+            <p className="text-sm text-text-secondary mb-1">No students enrolled yet.</p>
+            <p className="text-xs text-text-muted">
+              Click &ldquo;Enroll Student&rdquo; to manually add a contact to this course.
+            </p>
+          </div>
+        )}
+
+        {/* Table */}
+        {!isLoading && enrollments.length > 0 && (
+          <>
+            <div className="overflow-x-auto rounded-lg border border-border">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border bg-bg-elevated text-left">
+                    <th className="px-4 py-3 font-medium text-text-secondary">Student</th>
+                    <th className="px-4 py-3 font-medium text-text-secondary">Status</th>
+                    <th className="px-4 py-3 font-medium text-text-secondary">Progress</th>
+                    <th className="px-4 py-3 font-medium text-text-secondary">Enrolled</th>
+                    <th className="px-4 py-3 font-medium text-text-secondary w-16" />
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {enrollments.map((enrollment) => {
+                    const contact = enrollment.contact;
+                    const name = contact
+                      ? `${contact.first_name || ""} ${contact.last_name || ""}`.trim() || contact.email
+                      : `Contact #${enrollment.contact_id}`;
+                    const email = contact?.email || "";
+                    const initials = contact
+                      ? `${(contact.first_name || "?")[0]}${(contact.last_name || "?")[0]}`
+                      : "?";
+                    const progress = enrollment.progress_percentage ?? 0;
+
+                    return (
+                      <tr key={enrollment.id} className="hover:bg-bg-hover/50 transition-colors">
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-3">
+                            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-accent/10 text-xs font-semibold text-accent uppercase shrink-0">
+                              {initials}
+                            </div>
+                            <div className="min-w-0">
+                              <p className="font-medium text-foreground truncate">{name}</p>
+                              {email && <p className="text-xs text-text-muted truncate">{email}</p>}
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span
+                            className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
+                              enrollment.status === "active"
+                                ? "bg-green-500/10 text-green-600"
+                                : enrollment.status === "completed"
+                                  ? "bg-accent/10 text-accent"
+                                  : "bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400"
+                            }`}
+                          >
+                            {enrollment.status}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-2">
+                            <div className="h-1.5 w-20 rounded-full bg-border overflow-hidden">
+                              <div
+                                className="h-full rounded-full bg-accent transition-all"
+                                style={{ width: `${Math.min(progress, 100)}%` }}
+                              />
+                            </div>
+                            <span className="text-xs text-text-muted">{progress}%</span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-xs text-text-muted whitespace-nowrap">
+                          {new Date(enrollment.created_at).toLocaleDateString()}
+                        </td>
+                        <td className="px-4 py-3">
+                          <button
+                            onClick={() => unenroll({ courseId, enrollId: enrollment.id })}
+                            className="rounded-lg p-1.5 text-text-muted hover:bg-red-500/10 hover:text-red-500 transition-colors"
+                            title="Unenroll"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Pagination */}
+            {meta && meta.pages > 1 && (
+              <div className="flex items-center justify-between mt-4">
+                <p className="text-xs text-text-muted">
+                  Page {meta.page} of {meta.pages} ({meta.total} total)
+                </p>
+                <div className="flex gap-1">
+                  <button
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                    disabled={page <= 1}
+                    className="rounded-lg px-3 py-1.5 text-xs font-medium border border-border text-text-secondary hover:bg-bg-hover disabled:opacity-40 transition-colors"
+                  >
+                    Previous
+                  </button>
+                  <button
+                    onClick={() => setPage((p) => Math.min(meta.pages, p + 1))}
+                    disabled={page >= meta.pages}
+                    className="rounded-lg px-3 py-1.5 text-xs font-medium border border-border text-text-secondary hover:bg-bg-hover disabled:opacity-40 transition-colors"
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+
+      {/* Enroll Student Modal */}
+      {showEnrollModal && (
+        <EnrollStudentModal
+          courseId={courseId}
+          onClose={() => { setShowEnrollModal(false); setContactSearch(""); }}
+        />
+      )}
+    </div>
+  );
+}
+
+/* ================================================================= */
+/* EnrollStudentModal                                                  */
+/* ================================================================= */
+
+function EnrollStudentModal({ courseId, onClose }: { courseId: number; onClose: () => void }) {
+  const [search, setSearch] = useState("");
+  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const { data: contactsData, isLoading: searching } = useContacts({ search, pageSize: 10 });
+  const { mutate: enrollContact, isPending: enrolling } = useEnrollInCourse();
+
+  const contacts = contactsData?.data ?? [];
+
+  function handleEnroll() {
+    if (!selectedId) return;
+    enrollContact(
+      { courseId, contactId: selectedId, source: "admin" },
+      { onSuccess: () => onClose() }
+    );
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+      <div className="w-full max-w-md rounded-xl border border-border bg-bg-secondary p-6 shadow-2xl mx-4">
+        <div className="flex items-center justify-between mb-5">
+          <h2 className="text-lg font-semibold text-foreground">Enroll Student</h2>
+          <button
+            onClick={onClose}
+            className="rounded-lg p-1.5 text-text-muted hover:bg-bg-hover transition-colors"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        {/* Search */}
+        <input
+          type="text"
+          value={search}
+          onChange={(e) => { setSearch(e.target.value); setSelectedId(null); }}
+          placeholder="Search contacts by name or email..."
+          className="w-full rounded-lg border border-border bg-bg-elevated px-3 py-2.5 text-sm text-foreground placeholder:text-text-muted focus:border-accent focus:outline-none mb-3"
+          autoFocus
+        />
+
+        {/* Results */}
+        <div className="max-h-60 overflow-y-auto rounded-lg border border-border divide-y divide-border">
+          {searching && (
+            <div className="flex justify-center py-6">
+              <Loader2 className="h-5 w-5 animate-spin text-accent" />
+            </div>
+          )}
+          {!searching && contacts.length === 0 && (
+            <div className="py-6 text-center text-sm text-text-muted">
+              {search ? "No contacts found." : "Type to search contacts."}
+            </div>
+          )}
+          {!searching &&
+            contacts.map((c) => {
+              const name = `${c.first_name || ""} ${c.last_name || ""}`.trim() || c.email;
+              const selected = selectedId === c.id;
+              return (
+                <button
+                  key={c.id}
+                  onClick={() => setSelectedId(selected ? null : c.id)}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors ${
+                    selected ? "bg-accent/10" : "hover:bg-bg-hover"
+                  }`}
+                >
+                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-accent/10 text-xs font-semibold text-accent uppercase shrink-0">
+                    {(c.first_name || "?")[0]}{(c.last_name || "?")[0]}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-foreground truncate">{name}</p>
+                    <p className="text-xs text-text-muted truncate">{c.email}</p>
+                  </div>
+                  {selected && (
+                    <div className="h-5 w-5 rounded-full bg-accent flex items-center justify-center shrink-0">
+                      <svg className="h-3 w-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                      </svg>
+                    </div>
+                  )}
+                </button>
+              );
+            })}
+        </div>
+
+        {/* Actions */}
+        <div className="flex justify-end gap-2 mt-4">
+          <button
+            onClick={onClose}
+            className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-text-secondary hover:bg-bg-hover transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleEnroll}
+            disabled={!selectedId || enrolling}
+            className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-white hover:bg-accent-hover disabled:opacity-50 transition-colors"
+          >
+            {enrolling ? "Enrolling..." : "Enroll"}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

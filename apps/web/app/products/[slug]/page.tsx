@@ -1,6 +1,6 @@
 "use client";
 
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useState } from "react";
 import {
@@ -13,7 +13,13 @@ import {
   Download,
   RefreshCw,
 } from "lucide-react";
+import { toast } from "sonner";
 import { usePublicProduct } from "@/hooks/use-commerce";
+import { useAuth } from "@/hooks/use-auth";
+import { useCreateCheckout } from "@/hooks/use-checkout";
+import { StripeProvider } from "@/components/stripe-provider";
+import { CheckoutForm } from "@/components/checkout-form";
+import type { CheckoutResponse } from "@repo/shared/types";
 
 function formatPrice(amount: number, currency: string) {
   return new Intl.NumberFormat("en-US", {
@@ -33,8 +39,13 @@ const typeLabels: Record<string, string> = {
 export default function ProductDetailPage() {
   const params = useParams();
   const slug = typeof params.slug === "string" ? params.slug : "";
+  const router = useRouter();
   const { data: product, isLoading, error } = usePublicProduct(slug);
+  const { isAuthenticated } = useAuth();
+  const { mutate: createCheckout, isPending: checkingOut } = useCreateCheckout();
   const [selectedImage, setSelectedImage] = useState(0);
+  const [checkoutData, setCheckoutData] = useState<CheckoutResponse | null>(null);
+  const [selectedPriceId, setSelectedPriceId] = useState<number | null>(null);
 
   if (isLoading) {
     return (
@@ -198,13 +209,57 @@ export default function ProductDetailPage() {
           )}
 
           {/* CTA */}
-          <button className="mt-8 w-full rounded-xl bg-accent px-6 py-3.5 text-base font-semibold text-white hover:bg-accent/90 transition-colors">
-            {product.type === "membership"
-              ? "Join Now"
-              : product.type === "service"
-                ? "Book Now"
-                : "Buy Now"}
-          </button>
+          {checkoutData ? (
+            <div className="mt-8">
+              <StripeProvider
+                clientSecret={checkoutData.client_secret}
+                publishableKey={checkoutData.publishable_key}
+              >
+                <CheckoutForm
+                  amount={checkoutData.amount}
+                  currency={checkoutData.currency}
+                  orderId={checkoutData.order_id}
+                  onSuccess={(orderId) => {
+                    toast.success("Payment successful!");
+                    router.push(`/checkout/success?order_id=${orderId}`);
+                  }}
+                  onError={(msg) => {
+                    toast.error(msg);
+                    setCheckoutData(null);
+                  }}
+                />
+              </StripeProvider>
+            </div>
+          ) : (
+            <button
+              onClick={() => {
+                if (!isAuthenticated) {
+                  window.location.href = `/auth/login?redirect=/products/${slug}`;
+                  return;
+                }
+                createCheckout(
+                  {
+                    type: "product",
+                    product_id: product.id,
+                    price_id: selectedPriceId ?? primaryPrice?.id,
+                  },
+                  {
+                    onSuccess: (data) => setCheckoutData(data),
+                  }
+                );
+              }}
+              disabled={checkingOut}
+              className="mt-8 w-full rounded-xl bg-accent px-6 py-3.5 text-base font-semibold text-white hover:bg-accent/90 disabled:opacity-50 transition-colors"
+            >
+              {checkingOut
+                ? "Preparing checkout..."
+                : product.type === "membership"
+                  ? "Join Now"
+                  : product.type === "service"
+                    ? "Book Now"
+                    : "Buy Now"}
+            </button>
+          )}
 
           {/* Trust signals */}
           <div className="mt-6 grid grid-cols-2 gap-3">

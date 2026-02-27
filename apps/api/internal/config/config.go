@@ -69,6 +69,16 @@ type Config struct {
 	GithubClientID     string
 	GithubClientSecret string
 	OAuthFrontendURL   string // Where to redirect after OAuth callback
+
+	// Zoom Server-to-Server OAuth
+	ZoomAccountID    string
+	ZoomClientID     string
+	ZoomClientSecret string
+
+	// Stripe — Payment processing
+	StripeSecretKey      string
+	StripePublishableKey string
+	StripeWebhookSecret  string
 }
 
 // Load reads configuration from environment variables.
@@ -118,6 +128,14 @@ func Load() (*Config, error) {
 		GithubClientID:     getEnv("GITHUB_CLIENT_ID", ""),
 		GithubClientSecret: getEnv("GITHUB_CLIENT_SECRET", ""),
 		OAuthFrontendURL:   getEnv("OAUTH_FRONTEND_URL", "http://localhost:3001"),
+
+		ZoomAccountID:    getEnv("ZOOM_ACCOUNT_ID", ""),
+		ZoomClientID:     getEnv("ZOOM_CLIENT_ID", ""),
+		ZoomClientSecret: getEnv("ZOOM_CLIENT_SECRET", ""),
+
+		StripeSecretKey:      getEnv("STRIPE_SECRET_KEY", ""),
+		StripePublishableKey: getEnv("STRIPE_PUBLISHABLE_KEY", ""),
+		StripeWebhookSecret:  getEnv("STRIPE_WEBHOOK_SECRET", ""),
 	}
 
 	if cfg.DatabaseURL == "" {

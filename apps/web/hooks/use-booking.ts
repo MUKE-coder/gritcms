@@ -4,6 +4,16 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import type { BookingEventType, Appointment } from "@repo/shared/types";
 
+export function usePublicEventTypes() {
+  return useQuery({
+    queryKey: ["public-event-types"],
+    queryFn: async () => {
+      const { data } = await api.get("/api/p/booking/event-types");
+      return data.data as BookingEventType[];
+    },
+  });
+}
+
 export function usePublicEventType(slug: string) {
   return useQuery({
     queryKey: ["public-event-type", slug],
