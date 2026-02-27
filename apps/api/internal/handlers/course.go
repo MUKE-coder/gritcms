@@ -760,6 +760,195 @@ func safePercent(num, denom int64) float64 {
 	return math.Round(float64(num)/float64(denom)*10000) / 100
 }
 
+// ===== Student (Public Authenticated) Endpoints =====
+
+// StudentEnroll allows an authenticated user to self-enroll in a course.
+func (h *CourseHandler) StudentEnroll(c *gin.Context) {
+	courseID, _ := strconv.Atoi(c.Param("id"))
+	user, _ := c.Get("user")
+	u := user.(models.User)
+
+	// Load course to check access type
+	var course models.Course
+	if err := h.DB.First(&course, courseID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Course not found"})
+		return
+	}
+	if course.Status != models.CourseStatusPublished {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Course not found"})
+		return
+	}
+
+	// Only allow free courses for now (paid courses need payment integration)
+	if course.AccessType == models.CourseAccessPaid {
+		c.JSON(http.StatusPaymentRequired, gin.H{"error": "This course requires payment"})
+		return
+	}
+
+	// Find or create contact for this user
+	var contact models.Contact
+	if err := h.DB.Where("email = ? AND tenant_id = ?", u.Email, 1).First(&contact).Error; err != nil {
+		contact = models.Contact{
+			TenantID:  1,
+			Email:     u.Email,
+			FirstName: u.FirstName,
+			LastName:  u.LastName,
+			Source:    "organic",
+			UserID:    &u.ID,
+		}
+		h.DB.Create(&contact)
+	} else if contact.UserID == nil {
+		contact.UserID = &u.ID
+		h.DB.Save(&contact)
+	}
+
+	// Check if already enrolled
+	var existing models.CourseEnrollment
+	if err := h.DB.Where("contact_id = ? AND course_id = ?", contact.ID, courseID).First(&existing).Error; err == nil {
+		c.JSON(http.StatusOK, gin.H{"data": existing, "message": "Already enrolled"})
+		return
+	}
+
+	enrollment := models.CourseEnrollment{
+		TenantID:   1,
+		ContactID:  contact.ID,
+		CourseID:   uint(courseID),
+		Status:     models.EnrollStatusActive,
+		EnrolledAt: time.Now(),
+		Source:     "self-enroll",
+	}
+	if err := h.DB.Create(&enrollment).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to enroll"})
+		return
+	}
+	events.Emit(events.CourseEnrolled, enrollment)
+	c.JSON(http.StatusCreated, gin.H{"data": enrollment})
+}
+
+// StudentGetCourses returns all courses the authenticated user is enrolled in.
+func (h *CourseHandler) StudentGetCourses(c *gin.Context) {
+	user, _ := c.Get("user")
+	u := user.(models.User)
+
+	var contact models.Contact
+	if err := h.DB.Where("email = ? AND tenant_id = ?", u.Email, 1).First(&contact).Error; err != nil {
+		c.JSON(http.StatusOK, gin.H{"data": []interface{}{}})
+		return
+	}
+
+	var enrollments []models.CourseEnrollment
+	h.DB.Where("contact_id = ?", contact.ID).
+		Preload("Course").
+		Preload("Course.Modules", func(db *gorm.DB) *gorm.DB {
+			return db.Order("sort_order ASC")
+		}).
+		Preload("Course.Modules.Lessons", func(db *gorm.DB) *gorm.DB {
+			return db.Order("sort_order ASC")
+		}).
+		Preload("LessonProgresses").
+		Order("created_at DESC").
+		Find(&enrollments)
+
+	result := make([]gin.H, 0, len(enrollments))
+	for _, e := range enrollments {
+		result = append(result, gin.H{
+			"course":            e.Course,
+			"enrollment":        e,
+			"lesson_progresses": e.LessonProgresses,
+		})
+	}
+	c.JSON(http.StatusOK, gin.H{"data": result})
+}
+
+// StudentGetCourse returns a single course with enrollment and progress for the authenticated user.
+func (h *CourseHandler) StudentGetCourse(c *gin.Context) {
+	courseID, _ := strconv.Atoi(c.Param("id"))
+	user, _ := c.Get("user")
+	u := user.(models.User)
+
+	var course models.Course
+	if err := h.DB.Where("id = ? AND status = ?", courseID, models.CourseStatusPublished).
+		Preload("Modules", func(db *gorm.DB) *gorm.DB {
+			return db.Order("sort_order ASC")
+		}).
+		Preload("Modules.Lessons", func(db *gorm.DB) *gorm.DB {
+			return db.Order("sort_order ASC")
+		}).
+		Preload("Instructor").
+		First(&course).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Course not found"})
+		return
+	}
+
+	// Find contact + enrollment
+	var contact models.Contact
+	if err := h.DB.Where("email = ? AND tenant_id = ?", u.Email, 1).First(&contact).Error; err != nil {
+		c.JSON(http.StatusOK, gin.H{"data": gin.H{"course": course, "enrollment": nil, "lesson_progresses": []interface{}{}}})
+		return
+	}
+
+	var enrollment models.CourseEnrollment
+	if err := h.DB.Where("contact_id = ? AND course_id = ?", contact.ID, courseID).
+		Preload("LessonProgresses").
+		First(&enrollment).Error; err != nil {
+		c.JSON(http.StatusOK, gin.H{"data": gin.H{"course": course, "enrollment": nil, "lesson_progresses": []interface{}{}}})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"data": gin.H{
+		"course":            course,
+		"enrollment":        enrollment,
+		"lesson_progresses": enrollment.LessonProgresses,
+	}})
+}
+
+// StudentMarkLessonComplete marks a lesson as completed for the authenticated student.
+func (h *CourseHandler) StudentMarkLessonComplete(c *gin.Context) {
+	courseID, _ := strconv.Atoi(c.Param("id"))
+	lessonID, _ := strconv.Atoi(c.Param("lessonId"))
+	user, _ := c.Get("user")
+	u := user.(models.User)
+
+	// Find contact
+	var contact models.Contact
+	if err := h.DB.Where("email = ? AND tenant_id = ?", u.Email, 1).First(&contact).Error; err != nil {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Not enrolled"})
+		return
+	}
+
+	// Find enrollment
+	var enrollment models.CourseEnrollment
+	if err := h.DB.Where("contact_id = ? AND course_id = ?", contact.ID, courseID).First(&enrollment).Error; err != nil {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Not enrolled in this course"})
+		return
+	}
+
+	now := time.Now()
+	var progress models.LessonProgress
+	result := h.DB.Where("enrollment_id = ? AND lesson_id = ?", enrollment.ID, lessonID).First(&progress)
+
+	if result.Error == gorm.ErrRecordNotFound {
+		progress = models.LessonProgress{
+			TenantID:     1,
+			EnrollmentID: enrollment.ID,
+			LessonID:     uint(lessonID),
+			Status:       models.ProgressCompleted,
+			StartedAt:    &now,
+			CompletedAt:  &now,
+		}
+		h.DB.Create(&progress)
+	} else {
+		progress.Status = models.ProgressCompleted
+		progress.CompletedAt = &now
+		h.DB.Save(&progress)
+	}
+
+	events.Emit(events.CourseLessonCompleted, progress)
+	h.recalculateProgress(enrollment.ID)
+
+	c.JSON(http.StatusOK, gin.H{"data": progress})
+}
+
 func generateSlug(title string) string {
 	slug := strings.ToLower(title)
 	slug = strings.ReplaceAll(slug, " ", "-")

@@ -3,7 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { apiClient } from "@/lib/api-client";
-import type { Contact, Tag } from "@repo/shared/types";
+import type { Contact, Tag, ImportResult } from "@repo/shared/types";
 
 // --- Contacts ---
 
@@ -128,5 +128,43 @@ export function useDeleteTag() {
       toast.success("Tag deleted");
     },
     onError: () => toast.error("Failed to delete tag"),
+  });
+}
+
+// --- Import / Export ---
+
+export function useImportContacts() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (formData: FormData) => {
+      const { data } = await apiClient.post("/api/contacts/import", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      return data.data as ImportResult;
+    },
+    onSuccess: (result) => {
+      qc.invalidateQueries({ queryKey: ["contacts"] });
+      toast.success(`Imported: ${result.created} created, ${result.updated} updated`);
+    },
+    onError: () => toast.error("Failed to import contacts"),
+  });
+}
+
+export function useExportContacts() {
+  return useMutation({
+    mutationFn: async (format: "csv" | "xlsx") => {
+      const { data } = await apiClient.get(`/api/contacts/export?format=${format}`, {
+        responseType: "blob",
+      });
+      const ext = format === "xlsx" ? "xlsx" : "csv";
+      const blob = new Blob([data]);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `contacts.${ext}`;
+      a.click();
+      URL.revokeObjectURL(url);
+    },
+    onError: () => toast.error("Failed to export contacts"),
   });
 }

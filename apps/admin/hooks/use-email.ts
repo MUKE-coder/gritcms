@@ -16,6 +16,7 @@ import type {
   EmailSend,
   CampaignStats,
   Contact,
+  ImportResult,
 } from "@repo/shared/types";
 
 // --- Dashboard ---
@@ -582,5 +583,44 @@ export function useEmailSends(params: SendListParams = {}) {
       const { data } = await apiClient.get(`/api/email/sends?${sp}`);
       return data as { data: EmailSend[]; meta: { total: number; page: number; page_size: number; pages: number } };
     },
+  });
+}
+
+// --- Subscriber Import / Export ---
+
+export function useImportSubscribers() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ listId, formData }: { listId: number; formData: FormData }) => {
+      const { data } = await apiClient.post(`/api/email/lists/${listId}/import`, formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      return data.data as ImportResult;
+    },
+    onSuccess: (result, { listId }) => {
+      qc.invalidateQueries({ queryKey: ["email-subscriptions"] });
+      qc.invalidateQueries({ queryKey: ["email-list", listId] });
+      toast.success(`Imported: ${result.created} created, ${result.updated} updated`);
+    },
+    onError: () => toast.error("Failed to import subscribers"),
+  });
+}
+
+export function useExportSubscribers() {
+  return useMutation({
+    mutationFn: async ({ listId, format }: { listId: number; format: "csv" | "xlsx" }) => {
+      const { data } = await apiClient.get(`/api/email/lists/${listId}/export?format=${format}`, {
+        responseType: "blob",
+      });
+      const ext = format === "xlsx" ? "xlsx" : "csv";
+      const blob = new Blob([data]);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `subscribers-list-${listId}.${ext}`;
+      a.click();
+      URL.revokeObjectURL(url);
+    },
+    onError: () => toast.error("Failed to export subscribers"),
   });
 }

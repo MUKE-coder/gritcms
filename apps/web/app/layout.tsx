@@ -2,6 +2,8 @@ import type { Metadata, Viewport } from "next";
 import { Onest, JetBrains_Mono } from "next/font/google";
 import { Providers } from "@/components/providers";
 import { ThemeProvider } from "@/components/theme-provider";
+import { DarkModeProvider } from "@/components/dark-mode-provider";
+import { AuthProvider } from "@/components/auth-provider";
 import { Navbar } from "@/components/navbar";
 import { Footer } from "@/components/footer";
 import "./globals.css";
@@ -36,14 +38,25 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className="dark">
-      <body className={`${onest.variable} ${jetbrainsMono.variable} font-sans dark antialiased`}>
+    <html lang="en" className="dark" suppressHydrationWarning>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var t=localStorage.getItem("grit-theme");if(t==="light")document.documentElement.classList.remove("dark");else document.documentElement.classList.add("dark")}catch(e){}})()`,
+          }}
+        />
+      </head>
+      <body className={`${onest.variable} ${jetbrainsMono.variable} font-sans antialiased`}>
         <Providers>
-          <ThemeProvider>
-            <Navbar />
-            <main className="min-h-screen">{children}</main>
-            <Footer />
-          </ThemeProvider>
+          <DarkModeProvider>
+            <AuthProvider>
+              <ThemeProvider>
+                <Navbar />
+                <main className="min-h-screen">{children}</main>
+                <Footer />
+              </ThemeProvider>
+            </AuthProvider>
+          </DarkModeProvider>
         </Providers>
       </body>
     </html>

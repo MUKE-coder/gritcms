@@ -1,9 +1,11 @@
 package handlers
 
 import (
+	"fmt"
 	"math"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -469,5 +471,102 @@ func (h *ContactHandler) GetActivities(c *gin.Context) {
 			"page_size": pageSize,
 			"pages":     pages,
 		},
+	})
+}
+
+// ===== Import =====
+
+// ImportContacts imports contacts from a CSV, XLSX file, or pasted emails.
+func (h *ContactHandler) ImportContacts(c *gin.Context) {
+	source := c.DefaultPostForm("source", "import")
+
+	// Try file upload first
+	file, header, fileErr := c.Request.FormFile("file")
+	pastedEmails := c.PostForm("emails")
+
+	var rows [][]string
+	var parseErr error
+
+	if fileErr == nil {
+		defer file.Close()
+		ft := detectFileType(header.Filename)
+		switch ft {
+		case "csv":
+			rows, parseErr = parseCSVFile(file)
+		case "xlsx":
+			rows, parseErr = parseXLSXFile(file)
+		default:
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Unsupported file type. Use .csv or .xlsx"})
+			return
+		}
+		if parseErr != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to parse file: " + parseErr.Error()})
+			return
+		}
+	} else if pastedEmails != "" {
+		rows = parsePastedEmails(pastedEmails)
+	} else {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Provide a file or pasted emails"})
+		return
+	}
+
+	if len(rows) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "No data found"})
+		return
+	}
+
+	result := importResult{Total: len(rows)}
+
+	for _, row := range rows {
+		email := strings.ToLower(strings.TrimSpace(row[0]))
+		if !isValidEmail(email) {
+			result.Skipped++
+			continue
+		}
+
+		var contact models.Contact
+		err := h.DB.Where("tenant_id = ? AND email = ?", 1, email).First(&contact).Error
+
+		if err == gorm.ErrRecordNotFound {
+			now := time.Now()
+			contact = models.Contact{
+				TenantID:       1,
+				Email:          email,
+				FirstName:      safeIndex(row, 1),
+				LastName:       safeIndex(row, 2),
+				Phone:          safeIndex(row, 3),
+				Source:         source,
+				LastActivityAt: &now,
+			}
+			if createErr := h.DB.Create(&contact).Error; createErr != nil {
+				result.Errors = append(result.Errors, fmt.Sprintf("%s: %s", email, createErr.Error()))
+				continue
+			}
+			events.Emit(events.ContactCreated, contact)
+			result.Created++
+		} else if err == nil {
+			updates := map[string]interface{}{}
+			if fn := safeIndex(row, 1); fn != "" && contact.FirstName == "" {
+				updates["first_name"] = fn
+			}
+			if ln := safeIndex(row, 2); ln != "" && contact.LastName == "" {
+				updates["last_name"] = ln
+			}
+			if ph := safeIndex(row, 3); ph != "" && contact.Phone == "" {
+				updates["phone"] = ph
+			}
+			now := time.Now()
+			updates["last_activity_at"] = &now
+			h.DB.Model(&contact).Updates(updates)
+			result.Updated++
+		} else {
+			result.Errors = append(result.Errors, fmt.Sprintf("%s: %s", email, err.Error()))
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"data": result,
+		"message": fmt.Sprintf("Import complete: %d created, %d updated, %d skipped",
+			result.Created, result.Updated, result.Skipped),
 	})
 }

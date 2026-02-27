@@ -225,6 +225,7 @@ func Setup(db *gorm.DB, cfg *config.Config, svc *Services) *gin.Engine {
 	r.GET("/api/theme", publicCache, settingHandler.GetPublicTheme)
 
 	// Public email routes (subscribe, confirm, unsubscribe, tracking)
+	r.GET("/api/p/email/lists/:id", publicCache, emailHandler.GetPublicList)
 	r.POST("/api/email/subscribe", emailHandler.Subscribe)
 	r.GET("/api/email/confirm/:token", emailHandler.ConfirmSubscription)
 	r.POST("/api/email/unsubscribe", emailHandler.Unsubscribe)
@@ -299,6 +300,15 @@ func Setup(db *gorm.DB, cfg *config.Config, svc *Services) *gin.Engine {
 		protected.POST("/ai/complete", aiHandler.Complete)
 		protected.POST("/ai/chat", aiHandler.Chat)
 		protected.POST("/ai/stream", aiHandler.Stream)
+
+		// Student routes (any authenticated user)
+		student := protected.Group("/student")
+		{
+			student.GET("/courses", courseHandler.StudentGetCourses)
+			student.GET("/courses/:id", courseHandler.StudentGetCourse)
+			student.POST("/courses/:id/enroll", courseHandler.StudentEnroll)
+			student.POST("/courses/:id/lessons/:lessonId/complete", courseHandler.StudentMarkLessonComplete)
+		}
 
 		// grit:routes:protected
 	}
@@ -407,6 +417,8 @@ func Setup(db *gorm.DB, cfg *config.Config, svc *Services) *gin.Engine {
 		admin.GET("/email/lists/:id/subscribers", emailHandler.ListSubscribers)
 		admin.POST("/email/lists/:id/subscribers", emailHandler.AdminAddSubscriber)
 		admin.DELETE("/email/lists/:id/subscribers/:subId", emailHandler.AdminRemoveSubscriber)
+		admin.POST("/email/lists/:id/import", emailHandler.ImportSubscribers)
+		admin.GET("/email/lists/:id/export", emailHandler.ExportSubscribers)
 
 		// Email templates (admin)
 		admin.GET("/email/templates", emailHandler.ListTemplates)
@@ -550,6 +562,7 @@ func Setup(db *gorm.DB, cfg *config.Config, svc *Services) *gin.Engine {
 		admin.GET("/analytics/activity-timeline", analyticsHandler.ActivityTimeline)
 		admin.GET("/contacts/:id/profile", analyticsHandler.ContactProfile)
 		admin.GET("/contacts/export", analyticsHandler.ContactExport)
+		admin.POST("/contacts/import", contactHandler.ImportContacts)
 
 		// Community (admin)
 		admin.GET("/community/spaces", communityHandler.ListSpaces)

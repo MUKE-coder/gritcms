@@ -10,6 +10,8 @@ import {
   useTags,
   useCreateTag,
   useDeleteTag,
+  useImportContacts,
+  useExportContacts,
 } from "@/hooks/use-contacts";
 import {
   Plus,
@@ -21,9 +23,13 @@ import {
   Users,
   Tag,
   Eye,
+  Upload,
+  Download,
+  ChevronDown,
 } from "@/lib/icons";
 import { Dropzone, type UploadedFile } from "@/components/ui/dropzone";
-import type { Contact, Tag as TagType } from "@repo/shared/types";
+import { ImportModal } from "@/components/import-modal";
+import type { Contact, Tag as TagType, ImportResult } from "@repo/shared/types";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -98,6 +104,11 @@ export default function ContactsPage() {
   // Bulk state
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
 
+  // Import/Export state
+  const [showImport, setShowImport] = useState(false);
+  const [importResult, setImportResult] = useState<ImportResult | null>(null);
+  const [showExportMenu, setShowExportMenu] = useState(false);
+
   // Data
   const { data, isLoading } = useContacts({
     page,
@@ -112,6 +123,8 @@ export default function ContactsPage() {
   const { mutate: deleteContact } = useDeleteContact();
   const { mutate: createTag } = useCreateTag();
   const { mutate: deleteTag } = useDeleteTag();
+  const { mutate: importContacts, isPending: importing } = useImportContacts();
+  const { mutate: exportContacts } = useExportContacts();
 
   const contacts = data?.data ?? [];
   const meta = data?.meta;
@@ -218,6 +231,20 @@ export default function ContactsPage() {
     );
   };
 
+  const handleImportFile = (file: File) => {
+    const fd = new FormData();
+    fd.append("file", file);
+    fd.append("source", "import");
+    importContacts(fd, { onSuccess: (r) => setImportResult(r) });
+  };
+
+  const handleImportEmails = (emails: string) => {
+    const fd = new FormData();
+    fd.append("emails", emails);
+    fd.append("source", "import");
+    importContacts(fd, { onSuccess: (r) => setImportResult(r) });
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -236,6 +263,39 @@ export default function ContactsPage() {
             <Tag className="h-4 w-4" />
             Tags
           </button>
+          <button
+            onClick={() => { setImportResult(null); setShowImport(true); }}
+            className="flex items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-medium text-text-secondary hover:bg-bg-hover transition-colors"
+          >
+            <Upload className="h-4 w-4" />
+            Import
+          </button>
+          <div className="relative">
+            <button
+              onClick={() => setShowExportMenu(!showExportMenu)}
+              className="flex items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-medium text-text-secondary hover:bg-bg-hover transition-colors"
+            >
+              <Download className="h-4 w-4" />
+              Export
+              <ChevronDown className="h-3 w-3" />
+            </button>
+            {showExportMenu && (
+              <div className="absolute right-0 top-full mt-1 z-20 w-40 rounded-lg border border-border bg-bg-elevated shadow-xl py-1">
+                <button
+                  onClick={() => { exportContacts("csv"); setShowExportMenu(false); }}
+                  className="w-full px-3 py-2 text-left text-sm text-foreground hover:bg-bg-hover transition-colors"
+                >
+                  Export as CSV
+                </button>
+                <button
+                  onClick={() => { exportContacts("xlsx"); setShowExportMenu(false); }}
+                  className="w-full px-3 py-2 text-left text-sm text-foreground hover:bg-bg-hover transition-colors"
+                >
+                  Export as Excel
+                </button>
+              </div>
+            )}
+          </div>
           <button
             onClick={openCreate}
             className="flex items-center gap-2 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/90 transition-colors"
@@ -736,6 +796,17 @@ export default function ContactsPage() {
           </div>
         </div>
       )}
+
+      {/* Import Modal */}
+      <ImportModal
+        open={showImport}
+        onClose={() => setShowImport(false)}
+        onImportFile={handleImportFile}
+        onImportEmails={handleImportEmails}
+        isPending={importing}
+        result={importResult}
+        title="Import Contacts"
+      />
     </div>
   );
 }

@@ -8,9 +8,11 @@ import (
 	"math"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/xuri/excelize/v2"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 
@@ -125,6 +127,17 @@ func generateToken() string {
 	b := make([]byte, 32)
 	rand.Read(b)
 	return hex.EncodeToString(b)
+}
+
+// GetPublicList returns basic info about an email list (public endpoint).
+func (h *EmailHandler) GetPublicList(c *gin.Context) {
+	id, _ := strconv.Atoi(c.Param("id"))
+	var list models.EmailList
+	if err := h.DB.Select("id, name, description").First(&list, id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "List not found"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": gin.H{"id": list.ID, "name": list.Name, "description": list.Description}})
 }
 
 // Subscribe adds a contact to an email list (public endpoint).
@@ -918,4 +931,169 @@ func (h *EmailHandler) DashboardStats(c *gin.Context) {
 			"new_subscribers_30d": newSubscribers,
 		},
 	})
+}
+
+// ===== Subscriber Import / Export =====
+
+// ImportSubscribers imports subscribers to a specific email list from CSV, XLSX, or pasted emails.
+func (h *EmailHandler) ImportSubscribers(c *gin.Context) {
+	listID, _ := strconv.Atoi(c.Param("id"))
+
+	// Verify list exists
+	var list models.EmailList
+	if err := h.DB.First(&list, listID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Email list not found"})
+		return
+	}
+
+	// Parse file or pasted emails
+	file, header, fileErr := c.Request.FormFile("file")
+	pastedEmails := c.PostForm("emails")
+
+	var rows [][]string
+	var parseErr error
+
+	if fileErr == nil {
+		defer file.Close()
+		ft := detectFileType(header.Filename)
+		switch ft {
+		case "csv":
+			rows, parseErr = parseCSVFile(file)
+		case "xlsx":
+			rows, parseErr = parseXLSXFile(file)
+		default:
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Unsupported file type. Use .csv or .xlsx"})
+			return
+		}
+		if parseErr != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to parse file: " + parseErr.Error()})
+			return
+		}
+	} else if pastedEmails != "" {
+		rows = parsePastedEmails(pastedEmails)
+	} else {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Provide a file or pasted emails"})
+		return
+	}
+
+	if len(rows) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "No data found"})
+		return
+	}
+
+	result := importResult{Total: len(rows)}
+	now := time.Now()
+
+	for _, row := range rows {
+		email := strings.ToLower(strings.TrimSpace(row[0]))
+		if !isValidEmail(email) {
+			result.Skipped++
+			continue
+		}
+
+		// Upsert contact
+		var contact models.Contact
+		if err := h.DB.Where("email = ? AND tenant_id = ?", email, 1).First(&contact).Error; err != nil {
+			contact = models.Contact{
+				TenantID:       1,
+				Email:          email,
+				FirstName:      safeIndex(row, 1),
+				LastName:       safeIndex(row, 2),
+				Source:         "import",
+				LastActivityAt: &now,
+			}
+			h.DB.Create(&contact)
+		}
+
+		// Check existing subscription
+		var existing models.EmailSubscription
+		if err := h.DB.Where("contact_id = ? AND email_list_id = ?", contact.ID, listID).First(&existing).Error; err == nil {
+			if existing.Status == models.SubStatusActive {
+				result.Skipped++
+				continue
+			}
+			// Re-activate
+			existing.Status = models.SubStatusActive
+			existing.SubscribedAt = &now
+			existing.UnsubscribedAt = nil
+			h.DB.Save(&existing)
+			result.Updated++
+			continue
+		}
+
+		sub := models.EmailSubscription{
+			TenantID:    1,
+			ContactID:   contact.ID,
+			EmailListID: uint(listID),
+			Status:      models.SubStatusActive,
+			Source:       "import",
+			SubscribedAt: &now,
+		}
+		if err := h.DB.Create(&sub).Error; err != nil {
+			result.Errors = append(result.Errors, fmt.Sprintf("%s: %s", email, err.Error()))
+			continue
+		}
+		events.Emit(events.EmailSubscribed, sub)
+		result.Created++
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"data": result,
+		"message": fmt.Sprintf("Import complete: %d created, %d updated, %d skipped",
+			result.Created, result.Updated, result.Skipped),
+	})
+}
+
+// ExportSubscribers exports subscribers of a list as CSV or XLSX.
+func (h *EmailHandler) ExportSubscribers(c *gin.Context) {
+	listID, _ := strconv.Atoi(c.Param("id"))
+	format := c.DefaultQuery("format", "csv")
+
+	var subs []models.EmailSubscription
+	h.DB.Where("email_list_id = ?", listID).Preload("Contact").Find(&subs)
+
+	if format == "xlsx" {
+		f := excelize.NewFile()
+		sheet := "Sheet1"
+		headers := []string{"Email", "First Name", "Last Name", "Status", "Source", "Subscribed At"}
+		for i, hdr := range headers {
+			cell, _ := excelize.CoordinatesToCellName(i+1, 1)
+			f.SetCellValue(sheet, cell, hdr)
+		}
+		for rowIdx, sub := range subs {
+			row := rowIdx + 2
+			subscribedAt := ""
+			if sub.SubscribedAt != nil {
+				subscribedAt = sub.SubscribedAt.Format(time.RFC3339)
+			}
+			f.SetCellValue(sheet, fmt.Sprintf("A%d", row), sub.Contact.Email)
+			f.SetCellValue(sheet, fmt.Sprintf("B%d", row), sub.Contact.FirstName)
+			f.SetCellValue(sheet, fmt.Sprintf("C%d", row), sub.Contact.LastName)
+			f.SetCellValue(sheet, fmt.Sprintf("D%d", row), sub.Status)
+			f.SetCellValue(sheet, fmt.Sprintf("E%d", row), sub.Source)
+			f.SetCellValue(sheet, fmt.Sprintf("F%d", row), subscribedAt)
+		}
+		c.Header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+		c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=subscribers-list-%d.xlsx", listID))
+		f.Write(c.Writer)
+		return
+	}
+
+	// CSV export
+	c.Header("Content-Type", "text/csv")
+	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=subscribers-list-%d.csv", listID))
+	c.Writer.WriteString("email,first_name,last_name,status,source,subscribed_at\n")
+	for _, sub := range subs {
+		subscribedAt := ""
+		if sub.SubscribedAt != nil {
+			subscribedAt = sub.SubscribedAt.Format(time.RFC3339)
+		}
+		line := csvEscape(sub.Contact.Email) + "," +
+			csvEscape(sub.Contact.FirstName) + "," +
+			csvEscape(sub.Contact.LastName) + "," +
+			sub.Status + "," +
+			csvEscape(sub.Source) + "," +
+			subscribedAt + "\n"
+		c.Writer.WriteString(line)
+	}
 }

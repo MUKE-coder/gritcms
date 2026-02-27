@@ -2,9 +2,110 @@
 
 import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { useEmailList, useUpdateEmailList, useSubscribers, useRemoveSubscriber } from "@/hooks/use-email";
-import { ChevronLeft, Save, Trash2, Loader2 } from "@/lib/icons";
+import { useEmailList, useUpdateEmailList, useSubscribers, useRemoveSubscriber, useImportSubscribers, useExportSubscribers } from "@/hooks/use-email";
+import { ChevronLeft, Save, Trash2, Loader2, Share2, Copy, Check, X, Upload, Download, ChevronDown } from "@/lib/icons";
+import { toast } from "sonner";
+import { ImportModal } from "@/components/import-modal";
+import type { ImportResult } from "@repo/shared/types";
 import Link from "next/link";
+
+const WEB_URL = process.env.NEXT_PUBLIC_WEB_URL || "";
+
+const SOURCES = [
+  { label: "General", value: "" },
+  { label: "Instagram", value: "instagram" },
+  { label: "Twitter / X", value: "twitter" },
+  { label: "Facebook", value: "facebook" },
+  { label: "YouTube", value: "youtube" },
+  { label: "LinkedIn", value: "linkedin" },
+  { label: "TikTok", value: "tiktok" },
+];
+
+function buildSubscribeUrl(listId: number, source: string) {
+  const base = `${WEB_URL}/subscribe?list=${listId}`;
+  return source ? `${base}&source=${source}` : base;
+}
+
+function ShareLinksModal({ listId, listName, onClose }: { listId: number; listName: string; onClose: () => void }) {
+  const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
+  const [customSource, setCustomSource] = useState("");
+
+  const handleCopy = (url: string, idx: number) => {
+    navigator.clipboard.writeText(url);
+    setCopiedIdx(idx);
+    toast.success("Link copied!");
+    setTimeout(() => setCopiedIdx(null), 2000);
+  };
+
+  const customUrl = customSource.trim()
+    ? buildSubscribeUrl(listId, customSource.trim().toLowerCase().replace(/\s+/g, "-"))
+    : "";
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onClose}>
+      <div className="w-full max-w-lg rounded-xl border border-border bg-bg-elevated p-6 space-y-4" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-lg font-semibold text-foreground">Share Subscribe Link</h2>
+            <p className="text-sm text-text-muted mt-0.5">{listName}</p>
+          </div>
+          <button onClick={onClose} className="rounded-lg p-1.5 text-text-muted hover:bg-bg-hover">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        <div className="space-y-2">
+          {SOURCES.map((s, idx) => {
+            const url = buildSubscribeUrl(listId, s.value);
+            return (
+              <div key={s.value} className="flex items-center gap-2 rounded-lg border border-border bg-bg-secondary p-2.5">
+                <span className="shrink-0 w-24 text-xs font-medium text-text-secondary">{s.label}</span>
+                <input
+                  readOnly
+                  value={url}
+                  className="flex-1 bg-transparent text-xs text-text-muted truncate outline-none"
+                  onFocus={(e) => e.target.select()}
+                />
+                <button
+                  onClick={() => handleCopy(url, idx)}
+                  className="shrink-0 rounded-md p-1.5 text-text-muted hover:bg-bg-hover hover:text-foreground transition-colors"
+                  title="Copy link"
+                >
+                  {copiedIdx === idx ? <Check className="h-3.5 w-3.5 text-success" /> : <Copy className="h-3.5 w-3.5" />}
+                </button>
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="border-t border-border pt-4">
+          <label className="block text-xs font-medium text-text-secondary mb-1.5">Custom source tag</label>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              placeholder="e.g. podcast, webinar, flyer"
+              value={customSource}
+              onChange={(e) => setCustomSource(e.target.value)}
+              className="flex-1 rounded-lg border border-border bg-bg-secondary px-3 py-2 text-sm text-foreground placeholder:text-text-muted focus:border-accent focus:outline-none"
+            />
+            <button
+              onClick={() => { if (customUrl) handleCopy(customUrl, 100); }}
+              disabled={!customUrl}
+              className="rounded-lg bg-accent px-3 py-2 text-sm font-medium text-white hover:bg-accent/90 disabled:opacity-40 transition-colors"
+            >
+              {copiedIdx === 100 ? "Copied!" : "Copy"}
+            </button>
+          </div>
+          {customUrl && <p className="mt-1.5 text-xs text-text-muted truncate">{customUrl}</p>}
+        </div>
+
+        <p className="text-xs text-text-muted">
+          The source tag tracks where subscribers came from. You can see it in the Subscribers table.
+        </p>
+      </div>
+    </div>
+  );
+}
 
 export default function EmailListDetailPage() {
   const params = useParams();
@@ -18,11 +119,17 @@ export default function EmailListDetailPage() {
   const [statusFilter, setStatusFilter] = useState("");
   const { data: subsData } = useSubscribers({ listId: id, page, status: statusFilter || undefined });
   const { mutate: removeSub } = useRemoveSubscriber();
+  const { mutate: importSubs, isPending: importing } = useImportSubscribers();
+  const { mutate: exportSubs } = useExportSubscribers();
 
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [doubleOptin, setDoubleOptin] = useState(false);
   const [initialized, setInitialized] = useState(false);
+  const [showShare, setShowShare] = useState(false);
+  const [showImport, setShowImport] = useState(false);
+  const [importResult, setImportResult] = useState<ImportResult | null>(null);
+  const [showExportMenu, setShowExportMenu] = useState(false);
 
   if (list && !initialized) {
     setName(list.name);
@@ -33,6 +140,18 @@ export default function EmailListDetailPage() {
 
   const handleSave = () => {
     updateList({ id, name, description, double_optin: doubleOptin });
+  };
+
+  const handleImportFile = (file: File) => {
+    const fd = new FormData();
+    fd.append("file", file);
+    importSubs({ listId: id, formData: fd }, { onSuccess: (r) => setImportResult(r) });
+  };
+
+  const handleImportEmails = (emails: string) => {
+    const fd = new FormData();
+    fd.append("emails", emails);
+    importSubs({ listId: id, formData: fd }, { onSuccess: (r) => setImportResult(r) });
   };
 
   if (isLoading) {
@@ -55,6 +174,13 @@ export default function EmailListDetailPage() {
           <p className="text-text-secondary mt-1">{list?.subscriber_count ?? 0} subscribers</p>
         </div>
         <button
+          onClick={() => setShowShare(true)}
+          className="flex items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-medium text-text-secondary hover:bg-bg-hover transition-colors"
+        >
+          <Share2 className="h-4 w-4" />
+          Share
+        </button>
+        <button
           onClick={handleSave}
           disabled={saving}
           className="flex items-center gap-2 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/90 disabled:opacity-50"
@@ -63,6 +189,10 @@ export default function EmailListDetailPage() {
           {saving ? "Saving..." : "Save"}
         </button>
       </div>
+
+      {showShare && (
+        <ShareLinksModal listId={id} listName={list?.name || "Email List"} onClose={() => setShowShare(false)} />
+      )}
 
       {/* Settings */}
       <div className="rounded-xl border border-border bg-bg-secondary p-6 space-y-4">
@@ -102,17 +232,52 @@ export default function EmailListDetailPage() {
       <div className="rounded-xl border border-border bg-bg-secondary overflow-hidden">
         <div className="flex items-center justify-between px-4 py-3 border-b border-border">
           <h2 className="text-lg font-semibold text-foreground">Subscribers</h2>
-          <select
-            value={statusFilter}
-            onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
-            className="rounded-lg border border-border bg-bg-elevated px-3 py-1.5 text-sm text-foreground"
-          >
-            <option value="">All statuses</option>
-            <option value="active">Active</option>
-            <option value="unsubscribed">Unsubscribed</option>
-            <option value="bounced">Bounced</option>
-            <option value="pending">Pending</option>
-          </select>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => { setImportResult(null); setShowImport(true); }}
+              className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-text-secondary hover:bg-bg-hover transition-colors"
+            >
+              <Upload className="h-3.5 w-3.5" />
+              Import
+            </button>
+            <div className="relative">
+              <button
+                onClick={() => setShowExportMenu(!showExportMenu)}
+                className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-text-secondary hover:bg-bg-hover transition-colors"
+              >
+                <Download className="h-3.5 w-3.5" />
+                Export
+                <ChevronDown className="h-3 w-3" />
+              </button>
+              {showExportMenu && (
+                <div className="absolute right-0 top-full mt-1 z-20 w-40 rounded-lg border border-border bg-bg-elevated shadow-xl py-1">
+                  <button
+                    onClick={() => { exportSubs({ listId: id, format: "csv" }); setShowExportMenu(false); }}
+                    className="w-full px-3 py-2 text-left text-sm text-foreground hover:bg-bg-hover transition-colors"
+                  >
+                    Export as CSV
+                  </button>
+                  <button
+                    onClick={() => { exportSubs({ listId: id, format: "xlsx" }); setShowExportMenu(false); }}
+                    className="w-full px-3 py-2 text-left text-sm text-foreground hover:bg-bg-hover transition-colors"
+                  >
+                    Export as Excel
+                  </button>
+                </div>
+              )}
+            </div>
+            <select
+              value={statusFilter}
+              onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
+              className="rounded-lg border border-border bg-bg-elevated px-3 py-1.5 text-sm text-foreground"
+            >
+              <option value="">All statuses</option>
+              <option value="active">Active</option>
+              <option value="unsubscribed">Unsubscribed</option>
+              <option value="bounced">Bounced</option>
+              <option value="pending">Pending</option>
+            </select>
+          </div>
         </div>
         <table className="w-full text-sm">
           <thead>
@@ -187,6 +352,17 @@ export default function EmailListDetailPage() {
           </div>
         )}
       </div>
+
+      {/* Import Modal */}
+      <ImportModal
+        open={showImport}
+        onClose={() => setShowImport(false)}
+        onImportFile={handleImportFile}
+        onImportEmails={handleImportEmails}
+        isPending={importing}
+        result={importResult}
+        title="Import Subscribers"
+      />
     </div>
   );
 }

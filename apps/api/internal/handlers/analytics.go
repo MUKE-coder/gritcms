@@ -1,12 +1,14 @@
 package handlers
 
 import (
+	"fmt"
 	"math"
 	"net/http"
 	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/xuri/excelize/v2"
 	"gorm.io/gorm"
 
 	"gritcms/apps/api/internal/models"
@@ -281,15 +283,51 @@ func (h *AnalyticsHandler) TopProducts(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"data": stats})
 }
 
-// ContactExport exports contacts as CSV.
+// ContactExport exports contacts as CSV or XLSX (?format=xlsx).
 func (h *AnalyticsHandler) ContactExport(c *gin.Context) {
+	format := c.DefaultQuery("format", "csv")
+
 	var contacts []models.Contact
 	h.db.Preload("Tags").Find(&contacts)
 
+	if format == "xlsx" {
+		f := excelize.NewFile()
+		sheet := "Sheet1"
+		headers := []string{"ID", "Email", "First Name", "Last Name", "Phone", "Source", "Country", "City", "Tags", "Created At"}
+		for i, h := range headers {
+			cell, _ := excelize.CoordinatesToCellName(i+1, 1)
+			f.SetCellValue(sheet, cell, h)
+		}
+		for rowIdx, contact := range contacts {
+			tags := ""
+			for i, t := range contact.Tags {
+				if i > 0 {
+					tags += ";"
+				}
+				tags += t.Name
+			}
+			row := rowIdx + 2
+			f.SetCellValue(sheet, fmt.Sprintf("A%d", row), contact.ID)
+			f.SetCellValue(sheet, fmt.Sprintf("B%d", row), contact.Email)
+			f.SetCellValue(sheet, fmt.Sprintf("C%d", row), contact.FirstName)
+			f.SetCellValue(sheet, fmt.Sprintf("D%d", row), contact.LastName)
+			f.SetCellValue(sheet, fmt.Sprintf("E%d", row), contact.Phone)
+			f.SetCellValue(sheet, fmt.Sprintf("F%d", row), contact.Source)
+			f.SetCellValue(sheet, fmt.Sprintf("G%d", row), contact.Country)
+			f.SetCellValue(sheet, fmt.Sprintf("H%d", row), contact.City)
+			f.SetCellValue(sheet, fmt.Sprintf("I%d", row), tags)
+			f.SetCellValue(sheet, fmt.Sprintf("J%d", row), contact.CreatedAt.Format(time.RFC3339))
+		}
+		c.Header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+		c.Header("Content-Disposition", "attachment; filename=contacts.xlsx")
+		f.Write(c.Writer)
+		return
+	}
+
+	// CSV export (default)
 	c.Header("Content-Type", "text/csv")
 	c.Header("Content-Disposition", "attachment; filename=contacts.csv")
 
-	// Write CSV header
 	c.Writer.WriteString("id,email,first_name,last_name,phone,source,country,city,tags,created_at\n")
 
 	for _, contact := range contacts {

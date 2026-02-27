@@ -13,7 +13,7 @@ export type {
 
 export type { Upload } from "./upload";
 export type { Blog } from "./blog";
-export type { Contact, Tag, ContactActivity, CustomFieldDefinition } from "./contact";
+export type { Contact, Tag, ContactActivity, CustomFieldDefinition, ImportResult } from "./contact";
 export type { MediaAsset } from "./media";
 export type {
   ContentBlock,

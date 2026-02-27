@@ -3,7 +3,7 @@
 import React from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import { SectionRenderer } from "@repo/shared/sections";
+import { SectionRenderer, getSection } from "@repo/shared/sections";
 import type { PageSection } from "@repo/shared/sections";
 
 /**
@@ -89,9 +89,15 @@ export function LivePageRenderer({ sections }: { sections: PageSection[] }) {
     );
   }
 
+  // Filter out header/footer sections — those are handled by layout's Navbar & Footer
+  const contentSections = sections.filter((s) => {
+    const def = getSection(s.sectionId);
+    return def?.category !== "header" && def?.category !== "footer";
+  });
+
   return (
     <>
-      {sections.map((section) => {
+      {contentSections.map((section) => {
         const ds = section.props?.dataSource as string | undefined;
         const enhancedProps = { ...section.props };
 

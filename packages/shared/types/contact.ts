@@ -39,6 +39,14 @@ export interface ContactActivity {
   created_at: string;
 }
 
+export interface ImportResult {
+  created: number;
+  updated: number;
+  skipped: number;
+  errors: string[];
+  total: number;
+}
+
 export interface CustomFieldDefinition {
   id: number;
   tenant_id: number;

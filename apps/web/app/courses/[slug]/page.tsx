@@ -19,7 +19,10 @@ import {
   Eye,
 } from "lucide-react";
 import { usePublicCourse } from "@/hooks/use-courses";
-import type { Lesson, CourseModule } from "@repo/shared/types";
+import { useAuth } from "@/hooks/use-auth";
+import { useEnrollCourse, useStudentCourse } from "@/hooks/use-student";
+import { LessonPreviewModal } from "@/components/lesson-preview-modal";
+import type { Lesson } from "@repo/shared/types";
 import { useState } from "react";
 
 const lessonIcons: Record<string, typeof Play> = {
@@ -41,7 +44,13 @@ export default function CourseDetailPage() {
   const params = useParams();
   const slug = typeof params.slug === "string" ? params.slug : "";
   const { data: course, isLoading, error } = usePublicCourse(slug);
+  const { user, isAuthenticated } = useAuth();
+  const { data: studentCourse } = useStudentCourse(course?.id ?? 0);
+  const { mutate: enroll, isPending: enrolling } = useEnrollCourse();
   const [expandedModules, setExpandedModules] = useState<Set<number>>(new Set());
+  const [previewLesson, setPreviewLesson] = useState<Lesson | null>(null);
+
+  const isEnrolled = !!studentCourse?.enrollment;
 
   function toggleModule(id: number) {
     setExpandedModules((prev) => {
@@ -56,6 +65,15 @@ export default function CourseDetailPage() {
     if (course?.modules) {
       setExpandedModules(new Set(course.modules.map((m) => m.id)));
     }
+  }
+
+  function handleEnroll() {
+    if (!course) return;
+    if (!isAuthenticated) {
+      window.location.href = `/auth/login?redirect=/courses/${slug}`;
+      return;
+    }
+    enroll(course.id);
   }
 
   if (isLoading) {
@@ -200,19 +218,54 @@ export default function CourseDetailPage() {
           )}
         </div>
 
-        {/* Right - Thumbnail */}
-        <div className="rounded-xl border border-border overflow-hidden bg-bg-elevated">
-          {course.thumbnail ? (
-            <img
-              src={course.thumbnail}
-              alt={course.title}
-              className="w-full h-auto object-cover"
-            />
-          ) : (
-            <div className="aspect-video flex items-center justify-center bg-gradient-to-br from-accent/10 to-accent/5">
-              <BookOpen className="h-16 w-16 text-accent/20" />
-            </div>
-          )}
+        {/* Right - Thumbnail + Enroll CTA */}
+        <div className="space-y-4">
+          <div className="rounded-xl border border-border overflow-hidden bg-bg-elevated">
+            {course.thumbnail ? (
+              <img
+                src={course.thumbnail}
+                alt={course.title}
+                className="w-full h-auto object-cover"
+              />
+            ) : (
+              <div className="aspect-video flex items-center justify-center bg-gradient-to-br from-accent/10 to-accent/5">
+                <BookOpen className="h-16 w-16 text-accent/20" />
+              </div>
+            )}
+          </div>
+
+          {/* Enroll / Continue CTA */}
+          <div className="rounded-xl border border-border bg-bg-elevated p-5 space-y-3">
+            {isEnrolled ? (
+              <Link
+                href={`/learn/${course.slug}`}
+                className="block w-full rounded-lg bg-accent px-4 py-3 text-center text-sm font-semibold text-white hover:bg-accent-hover transition-colors"
+              >
+                Continue Learning
+              </Link>
+            ) : (
+              <button
+                onClick={handleEnroll}
+                disabled={enrolling}
+                className="w-full rounded-lg bg-accent px-4 py-3 text-sm font-semibold text-white hover:bg-accent-hover disabled:opacity-50 transition-colors"
+              >
+                {enrolling ? "Enrolling..." : course.access_type === "free" ? "Enroll for Free" : "Enroll Now"}
+              </button>
+            )}
+            {!isAuthenticated && (
+              <p className="text-xs text-text-muted text-center">
+                You&apos;ll need to create an account to enroll.
+              </p>
+            )}
+            {course.access_type === "paid" && !isEnrolled && (
+              <p className="text-xs text-text-muted text-center">
+                {new Intl.NumberFormat("en-US", {
+                  style: "currency",
+                  currency: course.currency || "USD",
+                }).format(course.price / 100)} &middot; Lifetime access
+              </p>
+            )}
+          </div>
         </div>
       </div>
 
@@ -280,22 +333,30 @@ export default function CourseDetailPage() {
                       <div className="divide-y divide-border/50">
                         {lessons.map((lesson) => {
                           const LessonIcon = lessonIcons[lesson.type] || FileText;
+                          const isFreePreview = lesson.is_free_preview;
 
                           return (
                             <div
                               key={lesson.id}
-                              className="flex items-center gap-3 px-5 py-3 pl-12 hover:bg-bg-hover/50 transition-colors"
+                              onClick={() => isFreePreview ? setPreviewLesson(lesson) : undefined}
+                              className={`flex items-center gap-3 px-5 py-3 pl-12 transition-colors ${
+                                isFreePreview
+                                  ? "cursor-pointer hover:bg-accent/5"
+                                  : "hover:bg-bg-hover/50"
+                              }`}
                             >
-                              <LessonIcon className="h-4 w-4 text-text-muted shrink-0" />
+                              <LessonIcon className={`h-4 w-4 shrink-0 ${isFreePreview ? "text-accent" : "text-text-muted"}`} />
                               <span className="flex-1 text-sm text-foreground truncate">
                                 {lesson.title}
                               </span>
                               <div className="flex items-center gap-2 shrink-0">
-                                {lesson.is_free_preview && (
+                                {isFreePreview ? (
                                   <span className="rounded-full bg-green-500/10 px-2 py-0.5 text-[10px] font-medium text-green-400 flex items-center gap-1">
                                     <Eye className="h-3 w-3" />
                                     Preview
                                   </span>
+                                ) : (
+                                  <Lock className="h-3.5 w-3.5 text-text-muted" />
                                 )}
                                 {lesson.duration_minutes > 0 && (
                                   <span className="text-xs text-text-muted">
@@ -325,6 +386,15 @@ export default function CourseDetailPage() {
           All courses
         </Link>
       </div>
+
+      {/* Free preview modal */}
+      {previewLesson && (
+        <LessonPreviewModal
+          lesson={previewLesson}
+          open={!!previewLesson}
+          onClose={() => setPreviewLesson(null)}
+        />
+      )}
     </div>
   );
 }
