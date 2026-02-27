@@ -75,13 +75,13 @@ export function ImportModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="bg-card border border-border rounded-xl shadow-xl w-full max-w-lg mx-4">
+      <div className="bg-bg-elevated border border-border rounded-xl shadow-xl w-full max-w-lg mx-4">
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-border">
-          <h2 className="text-lg font-semibold">{title}</h2>
+          <h2 className="text-lg font-semibold text-foreground">{title}</h2>
           <button
             onClick={handleClose}
-            className="p-1 text-muted-foreground hover:text-foreground transition-colors"
+            className="p-1 text-text-muted hover:text-foreground transition-colors"
           >
             <X className="h-5 w-5" />
           </button>
@@ -94,8 +94,8 @@ export function ImportModal({
               onClick={() => setTab("file")}
               className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${
                 tab === "file"
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-card text-muted-foreground hover:bg-muted"
+                  ? "bg-accent text-white"
+                  : "bg-bg-secondary text-text-muted hover:bg-bg-hover"
               }`}
             >
               Upload File
@@ -104,8 +104,8 @@ export function ImportModal({
               onClick={() => setTab("paste")}
               className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${
                 tab === "paste"
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-card text-muted-foreground hover:bg-muted"
+                  ? "bg-accent text-white"
+                  : "bg-bg-secondary text-text-muted hover:bg-bg-hover"
               }`}
             >
               Paste Emails
@@ -125,15 +125,15 @@ export function ImportModal({
                 onClick={() => fileRef.current?.click()}
                 className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
                   dragOver
-                    ? "border-primary bg-primary/5"
-                    : "border-border hover:border-primary/50 hover:bg-muted/50"
+                    ? "border-accent bg-accent/5"
+                    : "border-border hover:border-accent/50 hover:bg-bg-hover/50"
                 }`}
               >
-                <Upload className="h-8 w-8 mx-auto text-muted-foreground mb-3" />
-                <p className="text-sm font-medium">
+                <Upload className="h-8 w-8 mx-auto text-text-muted mb-3" />
+                <p className="text-sm font-medium text-foreground">
                   Drop a CSV or Excel file here
                 </p>
-                <p className="text-xs text-muted-foreground mt-1">
+                <p className="text-xs text-text-muted mt-1">
                   or click to browse
                 </p>
                 <input
@@ -146,25 +146,25 @@ export function ImportModal({
               </div>
 
               {selectedFile && (
-                <div className="mt-3 flex items-center gap-3 px-3 py-2.5 border border-border rounded-lg bg-muted/30">
-                  <File className="h-5 w-5 text-primary shrink-0" />
+                <div className="mt-3 flex items-center gap-3 px-3 py-2.5 border border-border rounded-lg bg-bg-secondary">
+                  <File className="h-5 w-5 text-accent shrink-0" />
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">{selectedFile.name}</p>
-                    <p className="text-xs text-muted-foreground">{formatSize(selectedFile.size)}</p>
+                    <p className="text-sm font-medium text-foreground truncate">{selectedFile.name}</p>
+                    <p className="text-xs text-text-muted">{formatSize(selectedFile.size)}</p>
                   </div>
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
                       setSelectedFile(null);
                     }}
-                    className="p-1 text-muted-foreground hover:text-foreground"
+                    className="p-1 text-text-muted hover:text-foreground"
                   >
                     <X className="h-4 w-4" />
                   </button>
                 </div>
               )}
 
-              <p className="text-xs text-muted-foreground mt-3">
+              <p className="text-xs text-text-muted mt-3">
                 Expected columns: <strong>email</strong>, first_name, last_name, phone (email is required)
               </p>
             </div>
@@ -177,10 +177,10 @@ export function ImportModal({
                 value={pastedText}
                 onChange={(e) => setPastedText(e.target.value)}
                 placeholder={"Paste emails here, one per line or separated by commas:\n\njohn@example.com\njane@example.com\nbob@example.com"}
-                className="w-full h-40 rounded-lg border border-border bg-background px-3 py-2.5 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none"
+                className="w-full h-40 rounded-lg border border-border bg-bg-secondary px-3 py-2.5 text-sm text-foreground placeholder:text-text-muted focus:outline-none focus:border-accent resize-none"
               />
               {detectedEmails.length > 0 && (
-                <p className="text-xs text-muted-foreground mt-2">
+                <p className="text-xs text-text-muted mt-2">
                   {detectedEmails.length} email{detectedEmails.length !== 1 ? "s" : ""} detected
                 </p>
               )}
@@ -190,22 +190,22 @@ export function ImportModal({
           {/* Results */}
           {result && (
             <div className="rounded-lg border border-border p-4 space-y-2">
-              <div className="flex items-center gap-2 text-sm font-medium">
+              <div className="flex items-center gap-2 text-sm font-medium text-foreground">
                 <Check className="h-4 w-4 text-green-500" />
                 Import complete
               </div>
               <div className="grid grid-cols-3 gap-2 text-center">
                 <div className="rounded-md bg-green-500/10 px-2 py-1.5">
                   <p className="text-lg font-bold text-green-500">{result.created}</p>
-                  <p className="text-xs text-muted-foreground">Created</p>
+                  <p className="text-xs text-text-muted">Created</p>
                 </div>
                 <div className="rounded-md bg-blue-500/10 px-2 py-1.5">
                   <p className="text-lg font-bold text-blue-500">{result.updated}</p>
-                  <p className="text-xs text-muted-foreground">Updated</p>
+                  <p className="text-xs text-text-muted">Updated</p>
                 </div>
                 <div className="rounded-md bg-zinc-500/10 px-2 py-1.5">
                   <p className="text-lg font-bold text-zinc-400">{result.skipped}</p>
-                  <p className="text-xs text-muted-foreground">Skipped</p>
+                  <p className="text-xs text-text-muted">Skipped</p>
                 </div>
               </div>
               {result.errors && result.errors.length > 0 && (
@@ -228,7 +228,7 @@ export function ImportModal({
           <div className="flex justify-end gap-2 pt-2">
             <button
               onClick={handleClose}
-              className="px-4 py-2 text-sm font-medium border border-border rounded-lg hover:bg-muted transition-colors"
+              className="px-4 py-2 text-sm font-medium border border-border rounded-lg text-text-secondary hover:bg-bg-hover transition-colors"
             >
               {result ? "Close" : "Cancel"}
             </button>
@@ -240,7 +240,7 @@ export function ImportModal({
                   (tab === "file" && !selectedFile) ||
                   (tab === "paste" && detectedEmails.length === 0)
                 }
-                className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 transition-colors"
+                className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-accent text-white rounded-lg hover:bg-accent/90 disabled:opacity-50 transition-colors"
               >
                 {isPending ? (
                   <>
