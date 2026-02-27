@@ -325,6 +325,7 @@ func Setup(db *gorm.DB, cfg *config.Config, svc *Services) *gin.Engine {
 		// Checkout (any authenticated user)
 		protected.POST("/checkout", paymentHandler.Checkout)
 		protected.GET("/checkout/:orderId/status", paymentHandler.CheckoutStatus)
+		protected.POST("/checkout/:orderId/confirm", paymentHandler.ConfirmCheckout)
 
 		// grit:routes:protected
 	}

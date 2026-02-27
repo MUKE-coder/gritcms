@@ -27,6 +27,15 @@ export function useCreateCheckout() {
   });
 }
 
+export function useConfirmCheckout() {
+  return useMutation({
+    mutationFn: async (orderId: number) => {
+      const { data } = await api.post(`/api/checkout/${orderId}/confirm`);
+      return data.data as { status: string };
+    },
+  });
+}
+
 export function useCheckoutStatus(orderId: number | null) {
   return useQuery({
     queryKey: ["checkout-status", orderId],

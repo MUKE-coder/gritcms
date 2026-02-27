@@ -320,6 +320,62 @@ func (h *PaymentHandler) CheckoutStatus(c *gin.Context) {
 	}})
 }
 
+// ConfirmCheckout is called by the frontend after stripe.confirmPayment succeeds.
+// It verifies the PaymentIntent via Stripe API and immediately fulfills the order,
+// so the user doesn't have to wait for the webhook.
+func (h *PaymentHandler) ConfirmCheckout(c *gin.Context) {
+	orderID := c.Param("orderId")
+	user, _ := c.Get("user")
+	u := user.(models.User)
+
+	var contact models.Contact
+	if err := h.db.Where("email = ? AND tenant_id = ?", u.Email, 1).First(&contact).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Contact not found"})
+		return
+	}
+
+	var order models.Order
+	if err := h.db.Where("id = ? AND contact_id = ?", orderID, contact.ID).Preload("Items").First(&order).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Order not found"})
+		return
+	}
+
+	// Idempotency: already paid
+	if order.Status == models.OrderStatusPaid {
+		c.JSON(http.StatusOK, gin.H{"data": gin.H{"status": "paid"}})
+		return
+	}
+
+	// Verify PaymentIntent status via Stripe
+	if order.PaymentID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "No payment associated with this order"})
+		return
+	}
+
+	pi, err := paymentintent.Get(order.PaymentID, nil)
+	if err != nil {
+		log.Printf("[confirm] Failed to retrieve PI %s: %v", order.PaymentID, err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to verify payment"})
+		return
+	}
+
+	if pi.Status != stripe.PaymentIntentStatusSucceeded {
+		c.JSON(http.StatusOK, gin.H{"data": gin.H{"status": string(pi.Status)}})
+		return
+	}
+
+	// Mark as paid and fulfill
+	now := time.Now()
+	order.Status = models.OrderStatusPaid
+	order.PaidAt = &now
+	h.db.Save(&order)
+
+	fulfillOrder(h.db, &order)
+
+	log.Printf("[confirm] Order %d confirmed and fulfilled (PI: %s)", order.ID, order.PaymentID)
+	c.JSON(http.StatusOK, gin.H{"data": gin.H{"status": "paid"}})
+}
+
 // StripeConfig returns the publishable key for the frontend.
 func (h *PaymentHandler) StripeConfig(c *gin.Context) {
 	if h.cfg.StripePublishableKey == "" {

@@ -22,7 +22,7 @@ import { toast } from "sonner";
 import { usePublicCourse } from "@/hooks/use-courses";
 import { useAuth } from "@/hooks/use-auth";
 import { useEnrollCourse, useStudentCourse } from "@/hooks/use-student";
-import { useCreateCheckout } from "@/hooks/use-checkout";
+import { useCreateCheckout, useConfirmCheckout } from "@/hooks/use-checkout";
 import { StripeProvider } from "@/components/stripe-provider";
 import { CheckoutForm } from "@/components/checkout-form";
 import { LessonPreviewModal } from "@/components/lesson-preview-modal";
@@ -53,6 +53,7 @@ export default function CourseDetailPage() {
   const router = useRouter();
   const { mutate: enroll, isPending: enrolling } = useEnrollCourse();
   const { mutate: createCheckout, isPending: checkingOut } = useCreateCheckout();
+  const { mutateAsync: confirmCheckout } = useConfirmCheckout();
   const [expandedModules, setExpandedModules] = useState<Set<number>>(new Set());
   const [previewLesson, setPreviewLesson] = useState<Lesson | null>(null);
   const [checkoutData, setCheckoutData] = useState<CheckoutResponse | null>(null);
@@ -266,8 +267,13 @@ export default function CourseDetailPage() {
                   amount={checkoutData.amount}
                   currency={checkoutData.currency}
                   orderId={checkoutData.order_id}
-                  onSuccess={() => {
+                  onSuccess={async (orderId) => {
                     toast.success("Payment successful! Enrolling...");
+                    try {
+                      await confirmCheckout(orderId);
+                    } catch {
+                      // Webhook will handle it as fallback
+                    }
                     router.push(`/learn/${course.slug}`);
                   }}
                   onError={(msg) => {

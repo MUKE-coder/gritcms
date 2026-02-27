@@ -16,7 +16,7 @@ import {
 import { toast } from "sonner";
 import { usePublicProduct } from "@/hooks/use-commerce";
 import { useAuth } from "@/hooks/use-auth";
-import { useCreateCheckout } from "@/hooks/use-checkout";
+import { useCreateCheckout, useConfirmCheckout } from "@/hooks/use-checkout";
 import { StripeProvider } from "@/components/stripe-provider";
 import { CheckoutForm } from "@/components/checkout-form";
 import type { CheckoutResponse } from "@repo/shared/types";
@@ -43,6 +43,7 @@ export default function ProductDetailPage() {
   const { data: product, isLoading, error } = usePublicProduct(slug);
   const { isAuthenticated } = useAuth();
   const { mutate: createCheckout, isPending: checkingOut } = useCreateCheckout();
+  const { mutateAsync: confirmCheckout } = useConfirmCheckout();
   const [selectedImage, setSelectedImage] = useState(0);
   const [checkoutData, setCheckoutData] = useState<CheckoutResponse | null>(null);
   const [selectedPriceId, setSelectedPriceId] = useState<number | null>(null);
@@ -219,8 +220,13 @@ export default function ProductDetailPage() {
                   amount={checkoutData.amount}
                   currency={checkoutData.currency}
                   orderId={checkoutData.order_id}
-                  onSuccess={(orderId) => {
+                  onSuccess={async (orderId) => {
                     toast.success("Payment successful!");
+                    try {
+                      await confirmCheckout(orderId);
+                    } catch {
+                      // Webhook will handle it as fallback
+                    }
                     router.push(`/checkout/success?order_id=${orderId}`);
                   }}
                   onError={(msg) => {
