@@ -125,13 +125,19 @@ export function useSubscribers(params: SubscriberListParams) {
 export function useAddSubscriber() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ listId, contactId }: { listId: number; contactId: number }) => {
-      const { data } = await apiClient.post(`/api/email/lists/${listId}/subscribers`, { contact_id: contactId });
+    mutationFn: async ({ listId, email, firstName, lastName, contactId }: { listId: number; email?: string; firstName?: string; lastName?: string; contactId?: number }) => {
+      const body: Record<string, unknown> = {};
+      if (contactId) body.contact_id = contactId;
+      if (email) body.email = email;
+      if (firstName) body.first_name = firstName;
+      if (lastName) body.last_name = lastName;
+      const { data } = await apiClient.post(`/api/email/lists/${listId}/subscribers`, body);
       return data.data;
     },
-    onSuccess: () => {
+    onSuccess: (_data, vars) => {
       qc.invalidateQueries({ queryKey: ["email-subscribers"] });
       qc.invalidateQueries({ queryKey: ["email-lists"] });
+      qc.invalidateQueries({ queryKey: ["email-list", vars.listId] });
       toast.success("Subscriber added");
     },
     onError: () => toast.error("Failed to add subscriber"),

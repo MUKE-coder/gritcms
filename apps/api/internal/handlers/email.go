@@ -280,20 +280,68 @@ func (h *EmailHandler) Unsubscribe(c *gin.Context) {
 }
 
 // AdminAddSubscriber allows admins to manually add a subscriber.
+// Accepts either contact_id (existing contact) or email (creates contact if needed).
 func (h *EmailHandler) AdminAddSubscriber(c *gin.Context) {
 	listID, _ := strconv.Atoi(c.Param("id"))
 	var body struct {
-		ContactID uint `json:"contact_id" binding:"required"`
+		ContactID uint   `json:"contact_id"`
+		Email     string `json:"email"`
+		FirstName string `json:"first_name"`
+		LastName  string `json:"last_name"`
 	}
 	if err := c.ShouldBindJSON(&body); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
+	contactID := body.ContactID
+
+	// If email provided instead of contact_id, find or create the contact
+	if contactID == 0 && body.Email != "" {
+		email := strings.TrimSpace(strings.ToLower(body.Email))
+		var contact models.Contact
+		if err := h.DB.Where("email = ? AND tenant_id = ?", email, 1).First(&contact).Error; err != nil {
+			contact = models.Contact{
+				TenantID:  1,
+				Email:     email,
+				FirstName: body.FirstName,
+				LastName:  body.LastName,
+				Source:    "manual",
+			}
+			if err := h.DB.Create(&contact).Error; err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create contact"})
+				return
+			}
+		}
+		contactID = contact.ID
+	}
+
+	if contactID == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Provide either contact_id or email"})
+		return
+	}
+
+	// Check for existing subscription
+	var existing models.EmailSubscription
+	if err := h.DB.Where("contact_id = ? AND email_list_id = ?", contactID, listID).First(&existing).Error; err == nil {
+		if existing.Status == models.SubStatusActive {
+			c.JSON(http.StatusOK, gin.H{"data": existing, "message": "Already subscribed"})
+			return
+		}
+		// Reactivate
+		now := time.Now()
+		existing.Status = models.SubStatusActive
+		existing.SubscribedAt = &now
+		existing.UnsubscribedAt = nil
+		h.DB.Save(&existing)
+		c.JSON(http.StatusOK, gin.H{"data": existing})
+		return
+	}
+
 	now := time.Now()
 	sub := models.EmailSubscription{
 		TenantID:     1,
-		ContactID:    body.ContactID,
+		ContactID:    contactID,
 		EmailListID:  uint(listID),
 		Status:       models.SubStatusActive,
 		Source:       "manual",

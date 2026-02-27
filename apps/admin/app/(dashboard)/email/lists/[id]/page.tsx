@@ -2,14 +2,14 @@
 
 import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { useEmailList, useUpdateEmailList, useSubscribers, useRemoveSubscriber, useImportSubscribers, useExportSubscribers } from "@/hooks/use-email";
-import { ChevronLeft, Save, Trash2, Loader2, Share2, Copy, Check, X, Upload, Download, ChevronDown } from "@/lib/icons";
+import { useEmailList, useUpdateEmailList, useSubscribers, useRemoveSubscriber, useAddSubscriber, useImportSubscribers, useExportSubscribers } from "@/hooks/use-email";
+import { ChevronLeft, Save, Trash2, Loader2, Share2, Copy, Check, X, Upload, Download, ChevronDown, Plus } from "@/lib/icons";
 import { toast } from "sonner";
 import { ImportModal } from "@/components/import-modal";
 import type { ImportResult } from "@repo/shared/types";
 import Link from "next/link";
 
-const WEB_URL = process.env.NEXT_PUBLIC_WEB_URL || "";
+const WEB_URL = process.env.NEXT_PUBLIC_WEB_URL || (typeof window !== "undefined" ? window.location.origin.replace("admin.", "") : "");
 
 const SOURCES = [
   { label: "General", value: "" },
@@ -119,6 +119,7 @@ export default function EmailListDetailPage() {
   const [statusFilter, setStatusFilter] = useState("");
   const { data: subsData } = useSubscribers({ listId: id, page, status: statusFilter || undefined });
   const { mutate: removeSub } = useRemoveSubscriber();
+  const { mutate: addSubscriber, isPending: adding } = useAddSubscriber();
   const { mutate: importSubs, isPending: importing } = useImportSubscribers();
   const { mutate: exportSubs } = useExportSubscribers();
 
@@ -130,6 +131,10 @@ export default function EmailListDetailPage() {
   const [showImport, setShowImport] = useState(false);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
   const [showExportMenu, setShowExportMenu] = useState(false);
+  const [showAddSub, setShowAddSub] = useState(false);
+  const [subEmail, setSubEmail] = useState("");
+  const [subFirstName, setSubFirstName] = useState("");
+  const [subLastName, setSubLastName] = useState("");
 
   if (list && !initialized) {
     setName(list.name);
@@ -140,6 +145,14 @@ export default function EmailListDetailPage() {
 
   const handleSave = () => {
     updateList({ id, name, description, double_optin: doubleOptin });
+  };
+
+  const handleAddSubscriber = () => {
+    if (!subEmail.trim()) return;
+    addSubscriber(
+      { listId: id, email: subEmail.trim(), firstName: subFirstName.trim(), lastName: subLastName.trim() },
+      { onSuccess: () => { setShowAddSub(false); setSubEmail(""); setSubFirstName(""); setSubLastName(""); } }
+    );
   };
 
   const handleImportFile = (file: File) => {
@@ -233,6 +246,13 @@ export default function EmailListDetailPage() {
         <div className="flex items-center justify-between px-4 py-3 border-b border-border">
           <h2 className="text-lg font-semibold text-foreground">Subscribers</h2>
           <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowAddSub(true)}
+              className="flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-white hover:bg-accent/90 transition-colors"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Add
+            </button>
             <button
               onClick={() => { setImportResult(null); setShowImport(true); }}
               className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-text-secondary hover:bg-bg-hover transition-colors"
@@ -352,6 +372,71 @@ export default function EmailListDetailPage() {
           </div>
         )}
       </div>
+
+      {/* Add Subscriber Modal */}
+      {showAddSub && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setShowAddSub(false)}>
+          <div className="w-full max-w-sm rounded-xl border border-border bg-bg-elevated p-6 space-y-4 mx-4" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-foreground">Add Subscriber</h2>
+              <button onClick={() => setShowAddSub(false)} className="rounded-lg p-1 text-text-muted hover:bg-bg-hover">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-text-secondary mb-1">Email *</label>
+              <input
+                type="email"
+                value={subEmail}
+                onChange={(e) => setSubEmail(e.target.value)}
+                placeholder="subscriber@example.com"
+                className="w-full rounded-lg border border-border bg-bg-secondary px-3 py-2 text-sm text-foreground focus:border-accent focus:outline-none"
+                onKeyDown={(e) => e.key === "Enter" && handleAddSubscriber()}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium text-text-secondary mb-1">First Name</label>
+                <input
+                  type="text"
+                  value={subFirstName}
+                  onChange={(e) => setSubFirstName(e.target.value)}
+                  placeholder="John"
+                  className="w-full rounded-lg border border-border bg-bg-secondary px-3 py-2 text-sm text-foreground focus:border-accent focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-text-secondary mb-1">Last Name</label>
+                <input
+                  type="text"
+                  value={subLastName}
+                  onChange={(e) => setSubLastName(e.target.value)}
+                  placeholder="Doe"
+                  className="w-full rounded-lg border border-border bg-bg-secondary px-3 py-2 text-sm text-foreground focus:border-accent focus:outline-none"
+                />
+              </div>
+            </div>
+            <p className="text-xs text-text-muted">
+              If a contact with this email exists, they will be subscribed to this list. Otherwise a new contact will be created.
+            </p>
+            <div className="flex justify-end gap-2 pt-1">
+              <button
+                onClick={() => setShowAddSub(false)}
+                className="rounded-lg border border-border px-4 py-2 text-sm text-text-secondary hover:bg-bg-hover"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleAddSubscriber}
+                disabled={!subEmail.trim() || adding}
+                className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/90 disabled:opacity-50"
+              >
+                {adding ? "Adding..." : "Add Subscriber"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Import Modal */}
       <ImportModal

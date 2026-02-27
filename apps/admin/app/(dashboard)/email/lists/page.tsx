@@ -6,7 +6,7 @@ import { useEmailLists, useDeleteEmailList, useCreateEmailList } from "@/hooks/u
 import { Plus, Trash2, Pencil, Search, Loader2, Share2, Link2, Copy, Check, X } from "@/lib/icons";
 import { toast } from "sonner";
 
-const WEB_URL = process.env.NEXT_PUBLIC_WEB_URL || "";
+const WEB_URL = process.env.NEXT_PUBLIC_WEB_URL || (typeof window !== "undefined" ? window.location.origin.replace("admin.", "") : "");
 
 const SOURCES = [
   { label: "General", value: "" },
