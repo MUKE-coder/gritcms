@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useDropzone, type Accept } from "react-dropzone";
 import { Upload, X, File, Image as ImageIcon, Loader2 } from "@/lib/icons";
 import { uploadFile } from "@/lib/api-client";
@@ -74,6 +74,15 @@ export function Dropzone({
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadError, setUploadError] = useState<string | null>(null);
+
+  // Sync internal files state when value prop changes (e.g. product data loads after mount)
+  const valueKey = value.map((f) => f.url).join("|");
+  useEffect(() => {
+    if (!uploading) {
+      setFiles(value);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [valueKey, uploading]);
 
   const onDrop = useCallback(
     async (acceptedFiles: File[]) => {
@@ -549,7 +558,9 @@ function FilePreview({ file, onRemove }: { file: UploadedFile; onRemove: () => v
       )}
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium text-foreground truncate">{file.name}</p>
-        <p className="text-xs text-text-muted">{formatSize(file.size)}</p>
+        {file.size > 0 && (
+          <p className="text-xs text-text-muted">{formatSize(file.size)}</p>
+        )}
       </div>
       <button
         type="button"

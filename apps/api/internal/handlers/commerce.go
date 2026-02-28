@@ -14,18 +14,27 @@ import (
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 
+	"gritcms/apps/api/internal/cache"
 	"gritcms/apps/api/internal/events"
 	"gritcms/apps/api/internal/models"
 )
 
 // CommerceHandler handles all commerce-related endpoints.
 type CommerceHandler struct {
-	db *gorm.DB
+	db    *gorm.DB
+	cache *cache.Cache
 }
 
 // NewCommerceHandler creates a new CommerceHandler.
-func NewCommerceHandler(db *gorm.DB) *CommerceHandler {
-	return &CommerceHandler{db: db}
+func NewCommerceHandler(db *gorm.DB, cache *cache.Cache) *CommerceHandler {
+	return &CommerceHandler{db: db, cache: cache}
+}
+
+// invalidateProductCache clears cached public product pages.
+func (h *CommerceHandler) invalidateProductCache(c *gin.Context) {
+	if h.cache != nil {
+		_ = h.cache.DeletePattern(c.Request.Context(), "http:*")
+	}
 }
 
 // ===================== PRODUCTS =====================
@@ -143,6 +152,7 @@ func (h *CommerceHandler) UpdateProduct(c *gin.Context) {
 	}
 
 	h.db.Preload("Prices").Preload("Variants").First(&product, id)
+	h.invalidateProductCache(c)
 	c.JSON(http.StatusOK, gin.H{"data": product})
 }
 

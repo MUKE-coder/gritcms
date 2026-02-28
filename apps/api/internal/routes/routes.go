@@ -186,7 +186,7 @@ func Setup(db *gorm.DB, cfg *config.Config, svc *Services) *gin.Engine {
 	settingHandler := handlers.NewSettingHandler(db)
 	emailHandler := handlers.NewEmailHandler(db, svc.Jobs)
 	courseHandler := handlers.NewCourseHandler(db)
-	commerceHandler := handlers.NewCommerceHandler(db)
+	commerceHandler := handlers.NewCommerceHandler(db, svc.Cache)
 	analyticsHandler := handlers.NewAnalyticsHandler(db)
 	communityHandler := handlers.NewCommunityHandler(db)
 	funnelHandler := handlers.NewFunnelHandler(db)
