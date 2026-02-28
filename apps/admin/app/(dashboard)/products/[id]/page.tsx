@@ -182,7 +182,7 @@ export default function ProductEditorPage() {
     createPrice(
       {
         productId,
-        amount: priceForm.amount,
+        amount: Math.round(priceForm.amount * 100),
         currency: priceForm.currency,
         type: priceForm.type,
         interval: priceForm.type === "subscription" ? priceForm.interval : "",
@@ -218,7 +218,7 @@ export default function ProductEditorPage() {
     setVariantForm({
       name: variant.name,
       sku: variant.sku,
-      price_override: variant.price_override,
+      price_override: variant.price_override != null ? variant.price_override / 100 : null,
       stock_quantity: variant.stock_quantity,
     });
     setEditingVariantId(variant.id);
@@ -226,6 +226,7 @@ export default function ProductEditorPage() {
   };
 
   const handleVariantSubmit = () => {
+    const priceOverrideCents = variantForm.price_override != null ? Math.round(variantForm.price_override * 100) : null;
     if (editingVariantId) {
       updateVariant(
         {
@@ -233,7 +234,7 @@ export default function ProductEditorPage() {
           variantId: editingVariantId,
           name: variantForm.name,
           sku: variantForm.sku,
-          price_override: variantForm.price_override,
+          price_override: priceOverrideCents,
           stock_quantity: variantForm.stock_quantity,
         },
         {
@@ -250,7 +251,7 @@ export default function ProductEditorPage() {
           productId,
           name: variantForm.name,
           sku: variantForm.sku,
-          price_override: variantForm.price_override,
+          price_override: priceOverrideCents,
           stock_quantity: variantForm.stock_quantity,
         },
         {
@@ -721,26 +722,27 @@ export default function ProductEditorPage() {
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-text-secondary mb-1">
-                  Amount (in cents)
+                  Amount
                 </label>
                 <input
                   type="number"
                   min={0}
-                  value={priceForm.amount}
+                  step="0.01"
+                  value={priceForm.amount || ""}
                   onChange={(e) =>
                     setPriceForm({
                       ...priceForm,
-                      amount: parseInt(e.target.value) || 0,
+                      amount: parseFloat(e.target.value) || 0,
                     })
                   }
-                  placeholder="e.g. 1999 for $19.99"
+                  placeholder="e.g. 19.99"
                   className="w-full rounded-lg border border-border bg-bg-elevated px-3 py-2 text-sm text-foreground focus:border-accent focus:outline-none"
                   autoFocus
                 />
                 <p className="text-xs text-text-muted mt-1">
                   {priceForm.amount > 0
-                    ? `Preview: ${formatCurrency(priceForm.amount, priceForm.currency)}`
-                    : "Enter amount in the smallest currency unit (e.g. cents)"}
+                    ? `Preview: ${formatCurrency(Math.round(priceForm.amount * 100), priceForm.currency)}`
+                    : "Enter the price (e.g. 30 for $30.00)"}
                 </p>
               </div>
 
@@ -903,17 +905,18 @@ export default function ProductEditorPage() {
 
               <div>
                 <label className="block text-sm font-medium text-text-secondary mb-1">
-                  Price Override (in cents, optional)
+                  Price Override (optional)
                 </label>
                 <input
                   type="number"
                   min={0}
+                  step="0.01"
                   value={variantForm.price_override ?? ""}
                   onChange={(e) =>
                     setVariantForm({
                       ...variantForm,
                       price_override: e.target.value
-                        ? parseInt(e.target.value)
+                        ? parseFloat(e.target.value)
                         : null,
                     })
                   }
@@ -925,7 +928,7 @@ export default function ProductEditorPage() {
                     <p className="text-xs text-text-muted mt-1">
                       Preview:{" "}
                       {formatCurrency(
-                        variantForm.price_override,
+                        Math.round(variantForm.price_override * 100),
                         product.prices?.[0]?.currency ?? "USD"
                       )}
                     </p>

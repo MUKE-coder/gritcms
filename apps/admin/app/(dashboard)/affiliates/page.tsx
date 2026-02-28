@@ -207,22 +207,27 @@ export default function AffiliatesPage() {
       name: p.name,
       description: p.description,
       commission_type: p.commission_type,
-      commission_amount: p.commission_amount,
+      commission_amount: p.commission_type === "fixed" ? p.commission_amount / 100 : p.commission_amount,
       cookie_days: p.cookie_days,
-      min_payout_amount: p.min_payout_amount,
+      min_payout_amount: p.min_payout_amount / 100,
       auto_approve: p.auto_approve,
     });
     setShowProgramModal(true);
   };
 
   const handleSaveProgram = () => {
+    const submitData = {
+      ...programForm,
+      commission_amount: programForm.commission_type === "fixed" ? Math.round(programForm.commission_amount * 100) : programForm.commission_amount,
+      min_payout_amount: Math.round(programForm.min_payout_amount * 100),
+    };
     if (editingProgram) {
       updateProgram(
-        { id: editingProgram.id, ...programForm },
+        { id: editingProgram.id, ...submitData },
         { onSuccess: () => setShowProgramModal(false) }
       );
     } else {
-      createProgram(programForm, {
+      createProgram(submitData, {
         onSuccess: () => setShowProgramModal(false),
       });
     }
@@ -1236,16 +1241,17 @@ export default function AffiliatesPage() {
                   Commission Amount
                   {programForm.commission_type === "percentage"
                     ? " (%)"
-                    : " (cents)"}
+                    : " ($)"}
                 </label>
                 <input
                   type="number"
-                  placeholder="0"
+                  placeholder={programForm.commission_type === "percentage" ? "e.g. 20" : "e.g. 5.00"}
+                  step={programForm.commission_type === "fixed" ? "0.01" : "1"}
                   value={programForm.commission_amount || ""}
                   onChange={(e) =>
                     setProgramForm({
                       ...programForm,
-                      commission_amount: parseInt(e.target.value) || 0,
+                      commission_amount: parseFloat(e.target.value) || 0,
                     })
                   }
                   className="w-full rounded-lg border border-border bg-bg-secondary px-3 py-2 text-sm text-foreground focus:border-accent focus:outline-none"
@@ -1273,16 +1279,17 @@ export default function AffiliatesPage() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-text-secondary mb-1">
-                  Min Payout (cents)
+                  Min Payout ($)
                 </label>
                 <input
                   type="number"
-                  placeholder="5000"
+                  step="0.01"
+                  placeholder="50.00"
                   value={programForm.min_payout_amount || ""}
                   onChange={(e) =>
                     setProgramForm({
                       ...programForm,
-                      min_payout_amount: parseInt(e.target.value) || 0,
+                      min_payout_amount: parseFloat(e.target.value) || 0,
                     })
                   }
                   className="w-full rounded-lg border border-border bg-bg-secondary px-3 py-2 text-sm text-foreground focus:border-accent focus:outline-none"

@@ -306,7 +306,7 @@ export default function CalendarDetailPage() {
       buffer_before: et.buffer_before,
       buffer_after: et.buffer_after,
       max_per_day: et.max_per_day,
-      price: et.price,
+      price: et.price / 100,
       color: et.color ?? "#6366f1",
     });
     setEditingEventTypeId(et.id);
@@ -314,9 +314,10 @@ export default function CalendarDetailPage() {
   };
 
   const handleEventTypeSubmit = () => {
+    const submitData = { ...eventTypeForm, price: Math.round(eventTypeForm.price * 100) };
     if (editingEventTypeId) {
       updateEventType(
-        { id: editingEventTypeId, ...eventTypeForm },
+        { id: editingEventTypeId, ...submitData },
         {
           onSuccess: () => {
             setShowEventTypeModal(false);
@@ -327,7 +328,7 @@ export default function CalendarDetailPage() {
       );
     } else {
       createEventType(
-        { calendarId, ...eventTypeForm },
+        { calendarId, ...submitData },
         {
           onSuccess: () => {
             setShowEventTypeModal(false);
@@ -939,18 +940,20 @@ export default function CalendarDetailPage() {
 
               <div>
                 <label className="block text-sm font-medium text-text-secondary mb-1">
-                  Price (cents, 0 = free)
+                  Price (0 = free)
                 </label>
                 <input
                   type="number"
                   min={0}
-                  value={eventTypeForm.price}
+                  step="0.01"
+                  value={eventTypeForm.price || ""}
                   onChange={(e) =>
                     setEventTypeForm({
                       ...eventTypeForm,
-                      price: parseInt(e.target.value) || 0,
+                      price: parseFloat(e.target.value) || 0,
                     })
                   }
+                  placeholder="e.g. 25.00"
                   className="w-full rounded-lg border border-border bg-bg-secondary px-3 py-2 text-sm text-foreground focus:border-accent focus:outline-none"
                 />
               </div>
