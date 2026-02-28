@@ -14,6 +14,8 @@ github.com/MUKE-coder/gorm-studio v1.0.1 h1:QB7c2Orqyb93GJBvlfPhRiTXTU2wiwzP+PLP
 github.com/MUKE-coder/gorm-studio v1.0.1/go.mod h1:0JC/ZXd4wmqmZzPvFrhMWuwEuq1HrfWWcaGC2tJVAyM=
 github.com/MUKE-coder/pulse v0.0.0-20260223005903-6f5d6e356231 h1:wyne29+/8HQ8QL1Ayf1zJR/upULJFqQ5rHVzpufrNvQ=
 github.com/MUKE-coder/pulse v0.0.0-20260223005903-6f5d6e356231/go.mod h1:rpCB20QAX5JdmwkYSv7L9wWuNLN1wRPvpgZf/pMUSsE=
+github.com/MUKE-coder/sentinel v1.1.0 h1:tUcg73IJ6sgrg6c8sRWo8ApSQKvPkJ1bbi/iG59Scsk=
+github.com/MUKE-coder/sentinel v1.1.0/go.mod h1:tuwVx+0wHdHGBgMu9YOTYeK+wpYAn2CD+gT6bYFMgI8=
 github.com/aws/aws-sdk-go-v2 v1.25.1 h1:P7hU6A5qEdmajGwvae/zDkOq+ULLC9tQBTwqqiwFGpI=
 github.com/aws/aws-sdk-go-v2 v1.25.1/go.mod h1:Evoc5AsmtveRt1komDwIsjHFyrP5tDuF1D1U+6z6pNo=
 github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.6.1 h1:gTK2uhtAPtFcdRRJilZPx8uJLL2J85xK11nKtWL0wfU=

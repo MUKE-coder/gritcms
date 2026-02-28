@@ -10,6 +10,7 @@ import (
 	"github.com/MUKE-coder/gin-docs/gindocs"
 	"github.com/MUKE-coder/gorm-studio/studio"
 	"github.com/MUKE-coder/pulse/pulse"
+	"github.com/MUKE-coder/sentinel"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 
@@ -54,38 +55,41 @@ func Setup(db *gorm.DB, cfg *config.Config, svc *Services) *gin.Engine {
 	r.MaxMultipartMemory = 50 << 20
 
 	// Mount Sentinel security suite (WAF, rate limiting, auth shield, anomaly detection)
-	// if cfg.SentinelEnabled {
-	// 	sentinel.Mount(r, db, sentinel.Config{
-	// 		Dashboard: sentinel.DashboardConfig{
-	// 			Username:  cfg.SentinelUsername,
-	// 			Password:  cfg.SentinelPassword,
-	// 			SecretKey: cfg.SentinelSecretKey,
-	// 		},
-	// 		WAF: sentinel.WAFConfig{
-	// 			Enabled: true,
-	// 			Mode:    sentinel.ModeLog, // Switch to sentinel.ModeBlock in production
-	// 		},
-	// 		RateLimit: sentinel.RateLimitConfig{
-	// 			Enabled: true,
-	// 			ByIP:    &sentinel.Limit{Requests: 100, Window: 1 * time.Minute},
-	// 			ByRoute: map[string]sentinel.Limit{
-	// 				"/api/auth/login":    {Requests: 5, Window: 15 * time.Minute},
-	// 				"/api/auth/register": {Requests: 3, Window: 15 * time.Minute},
-	// 			},
-	// 		},
-	// 		AuthShield: sentinel.AuthShieldConfig{
-	// 			Enabled:    true,
-	// 			LoginRoute: "/api/auth/login",
-	// 		},
-	// 		Anomaly: sentinel.AnomalyConfig{
-	// 			Enabled: true,
-	// 		},
-	// 		Geo: sentinel.GeoConfig{
-	// 			Enabled: true,
-	// 		},
-	// 	})
-	// 	log.Println("Sentinel security suite mounted at /sentinel")
-	// }
+	excludedRoutes := []string{"/pulse/*", "/studio/*", "/sentinel/*", "/docs/*", "/api/health"}
+	if cfg.SentinelEnabled {
+		sentinel.Mount(r, db, sentinel.Config{
+			Dashboard: sentinel.DashboardConfig{
+				Username:  cfg.SentinelUsername,
+				Password:  cfg.SentinelPassword,
+				SecretKey: cfg.SentinelSecretKey,
+			},
+			WAF: sentinel.WAFConfig{
+				Enabled:       true,
+				Mode:          sentinel.ModeBlock,
+				ExcludeRoutes: excludedRoutes,
+			},
+			RateLimit: sentinel.RateLimitConfig{
+				Enabled: true,
+				ByIP:    &sentinel.Limit{Requests: 100, Window: 1 * time.Minute},
+				ByRoute: map[string]sentinel.Limit{
+					"/api/auth/login":    {Requests: 5, Window: 15 * time.Minute},
+					"/api/auth/register": {Requests: 3, Window: 15 * time.Minute},
+				},
+				ExcludeRoutes: excludedRoutes,
+			},
+			AuthShield: sentinel.AuthShieldConfig{
+				Enabled:    true,
+				LoginRoute: "/api/auth/login",
+			},
+			Anomaly: sentinel.AnomalyConfig{
+				Enabled: true,
+			},
+			Geo: sentinel.GeoConfig{
+				Enabled: true,
+			},
+		})
+		log.Println("Sentinel security suite mounted at /sentinel")
+	}
 
 	// Mount GORM Studio
 	if cfg.GORMStudioEnabled {

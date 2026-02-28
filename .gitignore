@@ -42,6 +42,11 @@ minio-data/
 # Turborepo
 .turbo/
 
+# Sentinel (local SQLite DB)
+sentinel.db
+sentinel.db-shm
+sentinel.db-wal
+
 # Debug
 *.log
 npm-debug.log*

@@ -89,6 +89,19 @@ function priceTypeBadge(type: string) {
   }
 }
 
+/** Extract a human-readable filename from an upload URL. */
+function fileNameFromURL(url: string): string {
+  try {
+    const path = new URL(url).pathname;
+    const filename = path.split("/").pop() || "file";
+    // Strip the leading timestamp prefix (e.g. "1234567890-")
+    const match = filename.match(/^\d+-(.+)$/);
+    return match ? decodeURIComponent(match[1]) : decodeURIComponent(filename);
+  } catch {
+    return url.split("/").pop() || "file";
+  }
+}
+
 function formatCurrency(amount: number, currency: string) {
   return new Intl.NumberFormat("en-US", {
     style: "currency",
@@ -449,7 +462,7 @@ export default function ProductEditorPage() {
                   maxFiles={10}
                   maxSize={5 * 1024 * 1024}
                   accept={{ "image/*": [".jpg", ".jpeg", ".png", ".gif", ".webp"] }}
-                  value={images.map((url, i) => ({ url, name: `image-${i + 1}`, size: 0, type: "image/jpeg" } as UploadedFile))}
+                  value={images.map((url) => ({ url, name: fileNameFromURL(url), size: 0, type: "image/jpeg" } as UploadedFile))}
                   onFilesChange={(files) => setImages(files.map((f) => f.url))}
                   description="Upload up to 10 product images (max 5MB each)"
                 />
