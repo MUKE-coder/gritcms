@@ -307,17 +307,24 @@ func (h *PaymentHandler) CheckoutStatus(c *gin.Context) {
 	}
 
 	var order models.Order
-	if err := h.db.Where("id = ? AND contact_id = ?", orderID, contact.ID).First(&order).Error; err != nil {
+	if err := h.db.Where("id = ? AND contact_id = ?", orderID, contact.ID).
+		Preload("Items.Product").
+		First(&order).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Order not found"})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"data": gin.H{
+	response := gin.H{
 		"order_id":     order.ID,
 		"order_number": order.OrderNumber,
 		"status":       order.Status,
 		"total":        order.Total,
-	}})
+	}
+	if order.Status == models.OrderStatusPaid {
+		response["items"] = order.Items
+	}
+
+	c.JSON(http.StatusOK, gin.H{"data": response})
 }
 
 // ConfirmCheckout is called by the frontend after stripe.confirmPayment succeeds.

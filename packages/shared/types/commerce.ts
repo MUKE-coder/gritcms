@@ -170,6 +170,14 @@ export interface CheckoutStatus {
   order_number: string;
   status: string;
   total: number;
+  items?: OrderItem[];
+}
+
+// --- Purchases (student/my-purchases) ---
+
+export interface PurchaseData {
+  order: Order;
+  items: OrderItem[];
 }
 
 // --- Revenue Dashboard ---

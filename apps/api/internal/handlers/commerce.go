@@ -819,6 +819,61 @@ func (h *CommerceHandler) GetPublicProduct(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"data": product})
 }
 
+// ===================== STUDENT PURCHASES =====================
+
+// StudentGetPurchases returns all paid orders for the authenticated user.
+func (h *CommerceHandler) StudentGetPurchases(c *gin.Context) {
+	user, _ := c.Get("user")
+	u := user.(models.User)
+
+	var contact models.Contact
+	if err := h.db.Where("email = ? AND tenant_id = ?", u.Email, 1).First(&contact).Error; err != nil {
+		c.JSON(http.StatusOK, gin.H{"data": []interface{}{}})
+		return
+	}
+
+	var orders []models.Order
+	h.db.Where("contact_id = ? AND status = ?", contact.ID, models.OrderStatusPaid).
+		Preload("Items.Product").
+		Order("paid_at DESC").
+		Find(&orders)
+
+	result := make([]gin.H, 0, len(orders))
+	for _, o := range orders {
+		result = append(result, gin.H{
+			"order": o,
+			"items": o.Items,
+		})
+	}
+	c.JSON(http.StatusOK, gin.H{"data": result})
+}
+
+// StudentGetPurchase returns a single paid order for the authenticated user.
+func (h *CommerceHandler) StudentGetPurchase(c *gin.Context) {
+	orderID := c.Param("orderId")
+	user, _ := c.Get("user")
+	u := user.(models.User)
+
+	var contact models.Contact
+	if err := h.db.Where("email = ? AND tenant_id = ?", u.Email, 1).First(&contact).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Contact not found"})
+		return
+	}
+
+	var order models.Order
+	if err := h.db.Where("id = ? AND contact_id = ? AND status = ?", orderID, contact.ID, models.OrderStatusPaid).
+		Preload("Items.Product").
+		First(&order).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Purchase not found"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"data": gin.H{
+		"order": order,
+		"items": order.Items,
+	}})
+}
+
 // ===================== HELPERS =====================
 
 func generateProductSlug(name string) string {

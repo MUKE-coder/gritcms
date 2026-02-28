@@ -100,6 +100,7 @@ export type {
   CheckoutRequest,
   CheckoutResponse,
   CheckoutStatus,
+  PurchaseData,
 } from "./commerce";
 export type {
   AnalyticsDashboard,

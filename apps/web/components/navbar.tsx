@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Menu, X, Github, Sun, Moon, LogIn, BookOpen, LogOut, User as UserIcon } from "lucide-react";
+import { Menu, X, Github, Sun, Moon, LogIn, BookOpen, LogOut, User as UserIcon, Package } from "lucide-react";
 import { useMenu, useTheme } from "@/hooks/use-website";
 import { useColorMode } from "@/components/dark-mode-provider";
 import { useAuth } from "@/hooks/use-auth";
@@ -140,6 +140,14 @@ export function Navbar() {
                     <BookOpen className="h-4 w-4" />
                     My Courses
                   </Link>
+                  <Link
+                    href="/purchases"
+                    onClick={() => setDropdownOpen(false)}
+                    className="flex items-center gap-2 px-3 py-2 text-sm text-text-secondary hover:bg-bg-hover hover:text-foreground transition-colors"
+                  >
+                    <Package className="h-4 w-4" />
+                    My Purchases
+                  </Link>
                   {isAdmin && (
                     <a
                       href={`${ADMIN_URL}/login`}
@@ -232,6 +240,14 @@ export function Navbar() {
                 >
                   <BookOpen className="h-4 w-4" />
                   My Courses
+                </Link>
+                <Link
+                  href="/purchases"
+                  onClick={() => setMobileOpen(false)}
+                  className="flex items-center gap-2 text-sm py-2 text-text-secondary hover:text-foreground transition-colors"
+                >
+                  <Package className="h-4 w-4" />
+                  My Purchases
                 </Link>
                 {isAdmin && (
                   <a

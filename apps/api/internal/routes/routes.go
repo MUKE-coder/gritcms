@@ -325,6 +325,10 @@ func Setup(db *gorm.DB, cfg *config.Config, svc *Services) *gin.Engine {
 			student.GET("/courses/:id", courseHandler.StudentGetCourse)
 			student.POST("/courses/:id/enroll", courseHandler.StudentEnroll)
 			student.POST("/courses/:id/lessons/:lessonId/complete", courseHandler.StudentMarkLessonComplete)
+
+			// Purchases
+			student.GET("/purchases", commerceHandler.StudentGetPurchases)
+			student.GET("/purchases/:orderId", commerceHandler.StudentGetPurchase)
 		}
 
 		// Checkout (any authenticated user)

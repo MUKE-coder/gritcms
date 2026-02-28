@@ -3,7 +3,7 @@
 import { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { CheckCircle, Loader2, XCircle, ShoppingBag, BookOpen } from "lucide-react";
+import { CheckCircle, Loader2, XCircle, ShoppingBag, BookOpen, Download, Package } from "lucide-react";
 import { useCheckoutStatus } from "@/hooks/use-checkout";
 
 function CheckoutSuccessContent() {
@@ -109,10 +109,44 @@ function CheckoutSuccessContent() {
         </div>
       </div>
 
+      {status.items && status.items.some((item) =>
+        item.product?.downloadable_files && item.product.downloadable_files.length > 0
+      ) && (
+        <div className="mt-6 rounded-xl border border-border bg-bg-elevated p-6 text-left">
+          <h3 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
+            <Download className="h-4 w-4 text-accent" />
+            Your Downloads
+          </h3>
+          <div className="space-y-1">
+            {status.items.map((item) =>
+              item.product?.downloadable_files?.map((file, idx) => (
+                <a
+                  key={`${item.id}-${idx}`}
+                  href={file.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center justify-between py-2.5 px-3 rounded-lg hover:bg-bg-hover transition-colors group"
+                >
+                  <span className="text-sm text-foreground">{file.name}</span>
+                  <Download className="h-4 w-4 text-text-muted group-hover:text-accent transition-colors" />
+                </a>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+
       <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
         <Link
-          href="/courses"
+          href="/purchases"
           className="inline-flex items-center gap-2 rounded-lg bg-accent px-5 py-2.5 text-sm font-medium text-white hover:bg-accent-hover transition-colors"
+        >
+          <Package className="h-4 w-4" />
+          My Purchases
+        </Link>
+        <Link
+          href="/courses"
+          className="inline-flex items-center gap-2 rounded-lg border border-border px-5 py-2.5 text-sm font-medium text-foreground hover:bg-bg-hover transition-colors"
         >
           <BookOpen className="h-4 w-4" />
           My Courses
