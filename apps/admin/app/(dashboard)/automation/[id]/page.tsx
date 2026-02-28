@@ -36,6 +36,7 @@ import {
   useTriggerWorkflow,
   useExecutions,
 } from "@/hooks/use-workflows";
+import { useConfirm } from "@/hooks/use-confirm";
 import type { WorkflowAction, WorkflowExecution } from "@repo/shared/types";
 
 // ---------------------------------------------------------------------------
@@ -170,6 +171,7 @@ function configSummary(type: string, config: Record<string, unknown>): string {
 // ---------------------------------------------------------------------------
 
 export default function WorkflowEditorPage() {
+  const confirm = useConfirm();
   const params = useParams();
   const id = Number(params.id);
 
@@ -279,8 +281,14 @@ export default function WorkflowEditorPage() {
     }
   };
 
-  const handleDeleteAction = (actionId: number) => {
-    if (confirm("Remove this action?")) {
+  const handleDeleteAction = async (actionId: number) => {
+    const ok = await confirm({
+      title: "Remove Action",
+      description: "Remove this action from the workflow?",
+      confirmLabel: "Remove",
+      variant: "danger",
+    });
+    if (ok) {
       deleteAction({ workflowId: id, actionId });
     }
   };

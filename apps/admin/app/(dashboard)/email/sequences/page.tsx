@@ -8,11 +8,13 @@ import {
   useCreateEmailSequence,
 } from "@/hooks/use-email";
 import { Plus, Trash2, Pencil, Search, Loader2, Zap } from "@/lib/icons";
+import { useConfirm } from "@/hooks/use-confirm";
 
 export default function EmailSequencesPage() {
   const { data: sequences, isLoading } = useEmailSequences();
   const { mutate: deleteSequence } = useDeleteEmailSequence();
   const { mutate: createSequence } = useCreateEmailSequence();
+  const confirm = useConfirm();
 
   const [search, setSearch] = useState("");
   const [showCreate, setShowCreate] = useState(false);
@@ -235,9 +237,9 @@ export default function EmailSequencesPage() {
                         <Pencil className="h-4 w-4" />
                       </Link>
                       <button
-                        onClick={() => {
-                          if (confirm("Delete this sequence?"))
-                            deleteSequence(seq.id);
+                        onClick={async () => {
+                          const ok = await confirm({ title: "Delete Sequence", description: "Delete this sequence? This cannot be undone.", confirmLabel: "Delete", variant: "danger" });
+                          if (ok) deleteSequence(seq.id);
                         }}
                         className="rounded-lg p-1.5 text-text-muted hover:bg-danger/10 hover:text-danger"
                       >

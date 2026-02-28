@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
+import { useConfirm } from "@/hooks/use-confirm";
 import {
   ArrowLeft,
   Save,
@@ -129,6 +130,7 @@ export default function ProductEditorPage() {
   const { mutate: createVariant } = useCreateVariant();
   const { mutate: updateVariant } = useUpdateVariant();
   const { mutate: deleteVariant } = useDeleteVariant();
+  const confirm = useConfirm();
 
   // Tab state
   const [activeTab, setActiveTab] = useState<Tab>("details");
@@ -211,8 +213,14 @@ export default function ProductEditorPage() {
     );
   };
 
-  const handleDeletePrice = (priceId: number) => {
-    if (confirm("Delete this price?")) {
+  const handleDeletePrice = async (priceId: number) => {
+    const ok = await confirm({
+      title: "Delete Price",
+      description: "Delete this price? This cannot be undone.",
+      confirmLabel: "Delete",
+      variant: "danger",
+    });
+    if (ok) {
       deletePrice({ productId, priceId });
     }
   };
@@ -277,8 +285,14 @@ export default function ProductEditorPage() {
     }
   };
 
-  const handleDeleteVariant = (variantId: number) => {
-    if (confirm("Delete this variant?")) {
+  const handleDeleteVariant = async (variantId: number) => {
+    const ok = await confirm({
+      title: "Delete Variant",
+      description: "Delete this variant? This cannot be undone.",
+      confirmLabel: "Delete",
+      variant: "danger",
+    });
+    if (ok) {
       deleteVariant({ productId, variantId });
     }
   };

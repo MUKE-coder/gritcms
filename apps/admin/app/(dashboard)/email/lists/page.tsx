@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useEmailLists, useDeleteEmailList, useCreateEmailList } from "@/hooks/use-email";
 import { Plus, Trash2, Pencil, Search, Loader2, Share2, Link2, Copy, Check, X } from "@/lib/icons";
+import { useConfirm } from "@/hooks/use-confirm";
 import { toast } from "sonner";
 
 const WEB_URL = process.env.NEXT_PUBLIC_WEB_URL || "";
@@ -113,6 +114,7 @@ export default function EmailListsPage() {
   const { data: lists, isLoading } = useEmailLists();
   const { mutate: deleteList } = useDeleteEmailList();
   const { mutate: createList } = useCreateEmailList();
+  const confirm = useConfirm();
   const [search, setSearch] = useState("");
   const [showCreate, setShowCreate] = useState(false);
   const [newName, setNewName] = useState("");
@@ -269,8 +271,9 @@ export default function EmailListsPage() {
                         <Pencil className="h-4 w-4" />
                       </Link>
                       <button
-                        onClick={() => {
-                          if (confirm("Delete this list?")) deleteList(list.id);
+                        onClick={async () => {
+                          const ok = await confirm({ title: "Delete List", description: "Delete this list? This cannot be undone.", confirmLabel: "Delete", variant: "danger" });
+                          if (ok) deleteList(list.id);
                         }}
                         className="rounded-lg p-1.5 text-text-muted hover:bg-danger/10 hover:text-danger"
                       >

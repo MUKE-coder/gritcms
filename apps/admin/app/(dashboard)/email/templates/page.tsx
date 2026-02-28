@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useEmailTemplates, useDeleteEmailTemplate, useCreateEmailTemplate } from "@/hooks/use-email";
 import { Plus, Trash2, Pencil, Search, Loader2 } from "@/lib/icons";
+import { useConfirm } from "@/hooks/use-confirm";
 
 const TYPE_BADGES: Record<string, string> = {
   campaign: "bg-accent/10 text-accent",
@@ -15,6 +16,7 @@ export default function EmailTemplatesPage() {
   const { data: templates, isLoading } = useEmailTemplates();
   const { mutate: deleteTemplate } = useDeleteEmailTemplate();
   const { mutate: createTemplate } = useCreateEmailTemplate();
+  const confirm = useConfirm();
   const [search, setSearch] = useState("");
   const [showCreate, setShowCreate] = useState(false);
   const [newName, setNewName] = useState("");
@@ -158,8 +160,9 @@ export default function EmailTemplatesPage() {
                         <Pencil className="h-4 w-4" />
                       </Link>
                       <button
-                        onClick={() => {
-                          if (confirm("Delete this template?")) deleteTemplate(template.id);
+                        onClick={async () => {
+                          const ok = await confirm({ title: "Delete Template", description: "Delete this template? This cannot be undone.", confirmLabel: "Delete", variant: "danger" });
+                          if (ok) deleteTemplate(template.id);
                         }}
                         className="rounded-lg p-1.5 text-text-muted hover:bg-danger/10 hover:text-danger"
                       >

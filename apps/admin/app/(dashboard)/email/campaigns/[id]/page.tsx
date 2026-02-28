@@ -14,6 +14,7 @@ import {
   useSegments,
 } from "@/hooks/use-email";
 import { ChevronLeft, Save, Loader2, Play } from "@/lib/icons";
+import { useConfirm } from "@/hooks/use-confirm";
 
 const statusBadge: Record<string, string> = {
   draft: "bg-bg-elevated text-text-muted",
@@ -40,6 +41,7 @@ export default function CampaignEditorPage() {
   const { mutate: updateCampaign, isPending: isUpdating } = useUpdateEmailCampaign();
   const { mutate: createCampaign, isPending: isCreating } = useCreateEmailCampaign();
   const { mutate: scheduleCampaign, isPending: isScheduling } = useScheduleCampaign();
+  const confirm = useConfirm();
 
   // --- Form state ---
   const [name, setName] = useState("");
@@ -100,15 +102,17 @@ export default function CampaignEditorPage() {
     }
   }
 
-  function handleSendNow() {
-    if (!confirm("Send this campaign now? This cannot be undone.")) return;
+  async function handleSendNow() {
+    const ok = await confirm({ title: "Send Campaign", description: "Send this campaign now? This cannot be undone.", confirmLabel: "Send Now", variant: "danger" });
+    if (!ok) return;
     if (isNew) return;
     scheduleCampaign({ id });
   }
 
-  function handleSchedule() {
+  async function handleSchedule() {
     if (!scheduledAt) return;
-    if (!confirm(`Schedule this campaign for ${new Date(scheduledAt).toLocaleString()}?`)) return;
+    const ok = await confirm({ title: "Schedule Campaign", description: `Schedule this campaign for ${new Date(scheduledAt).toLocaleString()}?`, confirmLabel: "Schedule" });
+    if (!ok) return;
     if (isNew) return;
     scheduleCampaign({ id, scheduledAt: new Date(scheduledAt).toISOString() });
   }

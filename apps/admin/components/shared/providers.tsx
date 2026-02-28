@@ -4,12 +4,15 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "sonner";
 import { queryClient } from "@/lib/query-client";
 import { ThemeProvider } from "./theme-provider";
+import { ConfirmProvider } from "@/hooks/use-confirm";
 
 export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <ThemeProvider>
       <QueryClientProvider client={queryClient}>
+        <ConfirmProvider>
         {children}
+        </ConfirmProvider>
         <Toaster
           position="bottom-right"
           toastOptions={{

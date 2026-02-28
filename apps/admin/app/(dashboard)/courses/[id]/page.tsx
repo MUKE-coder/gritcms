@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
+import { useConfirm } from "@/hooks/use-confirm";
 import {
   ArrowLeft,
   Save,
@@ -136,6 +137,8 @@ export default function CourseEditorPage() {
   const { mutate: updateLesson } = useUpdateLesson();
   const { mutate: deleteLesson } = useDeleteLesson();
 
+  const confirm = useConfirm();
+
   // Tab state
   const [activeTab, setActiveTab] = useState<Tab>("details");
 
@@ -235,10 +238,9 @@ export default function CourseEditorPage() {
     }
   };
 
-  const handleDeleteModule = (modId: number) => {
-    if (confirm("Delete this module and all its lessons?")) {
-      deleteModule({ courseId, modId });
-    }
+  const handleDeleteModule = async (modId: number) => {
+    const ok = await confirm({ title: "Delete Module", description: "Delete this module and all its lessons? This cannot be undone.", confirmLabel: "Delete", variant: "danger" });
+    if (ok) deleteModule({ courseId, modId });
   };
 
   // -------------------------------------------------------------------------
@@ -296,10 +298,9 @@ export default function CourseEditorPage() {
     }
   };
 
-  const handleDeleteLesson = (lessonId: number) => {
-    if (confirm("Delete this lesson?")) {
-      deleteLesson({ courseId, lessonId });
-    }
+  const handleDeleteLesson = async (lessonId: number) => {
+    const ok = await confirm({ title: "Delete Lesson", description: "Delete this lesson? This cannot be undone.", confirmLabel: "Delete", variant: "danger" });
+    if (ok) deleteLesson({ courseId, lessonId });
   };
 
   // -------------------------------------------------------------------------

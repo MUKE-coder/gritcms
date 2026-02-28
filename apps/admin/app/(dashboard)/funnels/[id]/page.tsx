@@ -24,6 +24,7 @@ import {
   useUpdateStep,
   useDeleteStep,
 } from "@/hooks/use-funnels";
+import { useConfirm } from "@/hooks/use-confirm";
 import type { Funnel, FunnelStep } from "@repo/shared/types";
 
 // ---------------------------------------------------------------------------
@@ -86,6 +87,7 @@ const emptyStepForm: StepForm = { name: "", type: "landing", slug: "" };
 // ---------------------------------------------------------------------------
 
 export default function FunnelEditorPage() {
+  const confirm = useConfirm();
   const params = useParams();
   const funnelId = Number(params.id);
 
@@ -172,8 +174,14 @@ export default function FunnelEditorPage() {
     }
   };
 
-  const handleDeleteStep = (stepId: number) => {
-    if (confirm("Delete this step?")) {
+  const handleDeleteStep = async (stepId: number) => {
+    const ok = await confirm({
+      title: "Delete Step",
+      description: "Delete this step? This cannot be undone.",
+      confirmLabel: "Delete",
+      variant: "danger",
+    });
+    if (ok) {
       deleteStep({ funnelId, stepId });
     }
   };

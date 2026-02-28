@@ -36,6 +36,7 @@ import {
   useCreatePayout,
   useProcessPayout,
 } from "@/hooks/use-affiliates";
+import { useConfirm } from "@/hooks/use-confirm";
 import type {
   AffiliateProgram,
   AffiliateAccount,
@@ -114,6 +115,7 @@ function formatDate(iso: string) {
 // ---------------------------------------------------------------------------
 
 export default function AffiliatesPage() {
+  const confirm = useConfirm();
   const [activeTab, setActiveTab] = useState<MainTab>("dashboard");
 
   // Programs state
@@ -233,8 +235,14 @@ export default function AffiliatesPage() {
     }
   };
 
-  const handleDeleteProgram = (id: number) => {
-    if (confirm("Delete this program? This cannot be undone.")) {
+  const handleDeleteProgram = async (id: number) => {
+    const ok = await confirm({
+      title: "Delete Program",
+      description: "Delete this program? This cannot be undone.",
+      confirmLabel: "Delete",
+      variant: "danger",
+    });
+    if (ok) {
       deleteProgram(id);
     }
   };

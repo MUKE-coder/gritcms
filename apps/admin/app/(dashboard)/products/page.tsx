@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useConfirm } from "@/hooks/use-confirm";
 import {
   useProducts,
   useDeleteProduct,
@@ -71,6 +72,7 @@ export default function ProductsPage() {
   const { mutate: deleteProduct } = useDeleteProduct();
   const { mutate: createProduct, isPending: isCreating } = useCreateProduct();
   const { data: dashboard } = useRevenueDashboard();
+  const confirm = useConfirm();
 
   const products = data?.data ?? [];
   const meta = data?.meta;
@@ -457,9 +459,14 @@ export default function ProductsPage() {
                           <Pencil className="h-4 w-4" />
                         </Link>
                         <button
-                          onClick={() => {
-                            if (confirm("Delete this product?"))
-                              deleteProduct(product.id);
+                          onClick={async () => {
+                            const ok = await confirm({
+                              title: "Delete Product",
+                              description: "Delete this product? This cannot be undone.",
+                              confirmLabel: "Delete",
+                              variant: "danger",
+                            });
+                            if (ok) deleteProduct(product.id);
                           }}
                           className="rounded-lg p-1.5 text-text-muted hover:bg-danger/10 hover:text-danger"
                         >

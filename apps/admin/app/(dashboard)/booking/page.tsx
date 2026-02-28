@@ -26,6 +26,7 @@ import {
   useCompleteAppointment,
   useRescheduleAppointment,
 } from "@/hooks/use-booking";
+import { useConfirm } from "@/hooks/use-confirm";
 import type { Calendar as CalendarType, Appointment } from "@repo/shared/types";
 
 // ---------------------------------------------------------------------------
@@ -73,6 +74,7 @@ function minutesBetween(a: string, b: string) {
 // ---------------------------------------------------------------------------
 
 export default function BookingPage() {
+  const confirm = useConfirm();
   const [activeTab, setActiveTab] = useState<MainTab>("calendars");
 
   // ---- Calendars state ----
@@ -126,8 +128,14 @@ export default function BookingPage() {
     );
   };
 
-  const handleDeleteCalendar = (id: number) => {
-    if (confirm("Delete this calendar? This cannot be undone.")) {
+  const handleDeleteCalendar = async (id: number) => {
+    const ok = await confirm({
+      title: "Delete Calendar",
+      description: "Delete this calendar? This cannot be undone.",
+      confirmLabel: "Delete",
+      variant: "danger",
+    });
+    if (ok) {
       deleteCalendar(id);
     }
   };
@@ -447,9 +455,14 @@ export default function BookingPage() {
                                 <RefreshCw className="h-4 w-4" />
                               </button>
                               <button
-                                onClick={() => {
-                                  if (confirm("Cancel this appointment?"))
-                                    cancelAppt(appt.id);
+                                onClick={async () => {
+                                  const ok = await confirm({
+                                    title: "Cancel Appointment",
+                                    description: "Cancel this appointment? This cannot be undone.",
+                                    confirmLabel: "Cancel Appointment",
+                                    variant: "danger",
+                                  });
+                                  if (ok) cancelAppt(appt.id);
                                 }}
                                 className="rounded-lg p-1.5 text-text-muted hover:bg-red-500/10 hover:text-red-400 transition-colors"
                                 title="Cancel"
@@ -470,9 +483,14 @@ export default function BookingPage() {
                                 <Check className="h-4 w-4" />
                               </button>
                               <button
-                                onClick={() => {
-                                  if (confirm("Cancel this appointment?"))
-                                    cancelAppt(appt.id);
+                                onClick={async () => {
+                                  const ok = await confirm({
+                                    title: "Cancel Appointment",
+                                    description: "Cancel this appointment? This cannot be undone.",
+                                    confirmLabel: "Cancel Appointment",
+                                    variant: "danger",
+                                  });
+                                  if (ok) cancelAppt(appt.id);
                                 }}
                                 className="rounded-lg p-1.5 text-text-muted hover:bg-red-500/10 hover:text-red-400 transition-colors"
                                 title="Cancel"

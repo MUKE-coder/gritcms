@@ -16,6 +16,7 @@ import {
   X,
   Tag,
 } from "@/lib/icons";
+import { useConfirm } from "@/hooks/use-confirm";
 import type { Coupon } from "@repo/shared/types";
 
 const statusBadge: Record<string, string> = {
@@ -36,6 +37,7 @@ const EMPTY_FORM = {
 };
 
 export default function CouponsPage() {
+  const confirm = useConfirm();
   const { data: coupons, isLoading } = useCoupons();
   const { mutate: createCoupon, isPending: isCreating } = useCreateCoupon();
   const { mutate: updateCoupon, isPending: isUpdating } = useUpdateCoupon();
@@ -437,9 +439,14 @@ export default function CouponsPage() {
                         <Pencil className="h-4 w-4" />
                       </button>
                       <button
-                        onClick={() => {
-                          if (confirm("Delete this coupon?"))
-                            deleteCoupon(coupon.id);
+                        onClick={async () => {
+                          const ok = await confirm({
+                            title: "Delete Coupon",
+                            description: "Delete this coupon? This cannot be undone.",
+                            confirmLabel: "Delete",
+                            variant: "danger",
+                          });
+                          if (ok) deleteCoupon(coupon.id);
                         }}
                         className="rounded-lg p-1.5 text-text-muted hover:bg-danger/10 hover:text-danger"
                         title="Delete coupon"

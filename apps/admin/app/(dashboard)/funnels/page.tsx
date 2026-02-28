@@ -20,6 +20,7 @@ import {
   useCreateFunnel,
   useDeleteFunnel,
 } from "@/hooks/use-funnels";
+import { useConfirm } from "@/hooks/use-confirm";
 import type { Funnel } from "@repo/shared/types";
 
 // ---------------------------------------------------------------------------
@@ -62,6 +63,7 @@ const stepDotColor: Record<string, string> = {
 // ---------------------------------------------------------------------------
 
 export default function FunnelsPage() {
+  const confirm = useConfirm();
   const [page, setPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState("");
   const [search, setSearch] = useState("");
@@ -112,8 +114,14 @@ export default function FunnelsPage() {
     );
   };
 
-  const handleDelete = (id: number) => {
-    if (confirm("Delete this funnel? This cannot be undone.")) {
+  const handleDelete = async (id: number) => {
+    const ok = await confirm({
+      title: "Delete Funnel",
+      description: "Delete this funnel? This cannot be undone.",
+      confirmLabel: "Delete",
+      variant: "danger",
+    });
+    if (ok) {
       deleteFunnel(id);
     }
   };

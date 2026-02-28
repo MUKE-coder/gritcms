@@ -8,6 +8,7 @@ import {
   useUpdateSegment,
 } from "@/hooks/use-email";
 import { Plus, Trash2, Pencil, Search, Loader2, Users, Eye, X } from "@/lib/icons";
+import { useConfirm } from "@/hooks/use-confirm";
 import type { Segment, SegmentRule, SegmentRuleGroup, SegmentType } from "@repo/shared/types";
 
 // ---------------------------------------------------------------------------
@@ -85,6 +86,7 @@ export default function EmailSegmentsPage() {
   const { mutate: deleteSegment } = useDeleteSegment();
   const { mutate: createSegment, isPending: isCreating } = useCreateSegment();
   const { mutate: updateSegment, isPending: isUpdating } = useUpdateSegment();
+  const confirm = useConfirm();
 
   const [search, setSearch] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
@@ -401,8 +403,9 @@ export default function EmailSegmentsPage() {
                         <Pencil className="h-4 w-4" />
                       </button>
                       <button
-                        onClick={() => {
-                          if (confirm("Delete this segment?")) deleteSegment(seg.id);
+                        onClick={async () => {
+                          const ok = await confirm({ title: "Delete Segment", description: "Delete this segment? This cannot be undone.", confirmLabel: "Delete", variant: "danger" });
+                          if (ok) deleteSegment(seg.id);
                         }}
                         className="rounded-lg p-1.5 text-text-muted hover:bg-danger/10 hover:text-danger"
                         title="Delete segment"

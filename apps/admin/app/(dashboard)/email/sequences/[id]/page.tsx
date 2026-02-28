@@ -13,6 +13,7 @@ import {
   useCancelEnrollment,
 } from "@/hooks/use-email";
 import { ChevronLeft, Save, Loader2, Plus, Trash2, Pencil } from "@/lib/icons";
+import { useConfirm } from "@/hooks/use-confirm";
 
 interface StepForm {
   subject: string;
@@ -42,6 +43,7 @@ export default function SequenceEditorPage() {
   const { mutate: deleteStep } = useDeleteSequenceStep();
   const { data: enrollments } = useSequenceEnrollments(id);
   const { mutate: cancelEnrollment } = useCancelEnrollment();
+  const confirm = useConfirm();
 
   // Sequence settings state
   const [name, setName] = useState("");
@@ -147,8 +149,9 @@ export default function SequenceEditorPage() {
     }
   };
 
-  const handleDeleteStep = (stepId: number) => {
-    if (confirm("Delete this step?")) {
+  const handleDeleteStep = async (stepId: number) => {
+    const ok = await confirm({ title: "Delete Step", description: "Delete this step? This cannot be undone.", confirmLabel: "Delete", variant: "danger" });
+    if (ok) {
       deleteStep({ sequenceId: id, stepId });
     }
   };
@@ -550,8 +553,9 @@ export default function SequenceEditorPage() {
                     <div className="flex justify-end">
                       {enrollment.status === "active" && (
                         <button
-                          onClick={() => {
-                            if (confirm("Cancel this enrollment?"))
+                          onClick={async () => {
+                            const ok = await confirm({ title: "Cancel Enrollment", description: "Cancel this enrollment? This cannot be undone.", confirmLabel: "Cancel Enrollment", variant: "danger" });
+                            if (ok)
                               cancelEnrollment({
                                 sequenceId: id,
                                 enrollId: enrollment.id,

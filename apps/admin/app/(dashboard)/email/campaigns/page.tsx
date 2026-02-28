@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useEmailCampaigns, useDeleteEmailCampaign } from "@/hooks/use-email";
 import { Plus, Trash2, Pencil, Search, Loader2 } from "@/lib/icons";
+import { useConfirm } from "@/hooks/use-confirm";
 
 const STATUSES = ["draft", "scheduled", "sending", "sent", "cancelled"] as const;
 
@@ -25,6 +26,7 @@ export default function CampaignsPage() {
     status: statusFilter || undefined,
   });
   const { mutate: deleteCampaign } = useDeleteEmailCampaign();
+  const confirm = useConfirm();
 
   const campaigns = data?.data ?? [];
   const meta = data?.meta;
@@ -119,9 +121,9 @@ export default function CampaignsPage() {
                       </Link>
                       {campaign.status !== "sending" && (
                         <button
-                          onClick={() => {
-                            if (confirm("Delete this campaign?"))
-                              deleteCampaign(campaign.id);
+                          onClick={async () => {
+                            const ok = await confirm({ title: "Delete Campaign", description: "Delete this campaign? This cannot be undone.", confirmLabel: "Delete", variant: "danger" });
+                            if (ok) deleteCampaign(campaign.id);
                           }}
                           className="rounded-lg p-1.5 text-text-muted hover:bg-danger/10 hover:text-danger"
                         >

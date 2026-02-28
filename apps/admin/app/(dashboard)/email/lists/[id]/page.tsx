@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useEmailList, useUpdateEmailList, useSubscribers, useRemoveSubscriber, useAddSubscriber, useImportSubscribers, useExportSubscribers } from "@/hooks/use-email";
 import { ChevronLeft, Save, Trash2, Loader2, Share2, Copy, Check, X, Upload, Download, ChevronDown, Plus } from "@/lib/icons";
+import { useConfirm } from "@/hooks/use-confirm";
 import { toast } from "sonner";
 import { ImportModal } from "@/components/import-modal";
 import type { ImportResult } from "@repo/shared/types";
@@ -119,6 +120,7 @@ export default function EmailListDetailPage() {
   const [statusFilter, setStatusFilter] = useState("");
   const { data: subsData } = useSubscribers({ listId: id, page, status: statusFilter || undefined });
   const { mutate: removeSub } = useRemoveSubscriber();
+  const confirm = useConfirm();
   const { mutate: addSubscriber, isPending: adding } = useAddSubscriber();
   const { mutate: importSubs, isPending: importing } = useImportSubscribers();
   const { mutate: exportSubs } = useExportSubscribers();
@@ -335,8 +337,9 @@ export default function EmailListDetailPage() {
                 <td className="px-4 py-3">
                   <div className="flex justify-end">
                     <button
-                      onClick={() => {
-                        if (confirm("Remove this subscriber?")) removeSub({ listId: id, subId: sub.id });
+                      onClick={async () => {
+                        const ok = await confirm({ title: "Remove Subscriber", description: "Remove this subscriber? This cannot be undone.", confirmLabel: "Remove", variant: "danger" });
+                        if (ok) removeSub({ listId: id, subId: sub.id });
                       }}
                       className="rounded-lg p-1.5 text-text-muted hover:bg-danger/10 hover:text-danger"
                     >

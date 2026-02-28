@@ -15,6 +15,7 @@ import {
   useContactSources,
   useSendEmailToContacts,
 } from "@/hooks/use-contacts";
+import { useConfirm } from "@/hooks/use-confirm";
 import { useEmailTemplates } from "@/hooks/use-email";
 import {
   Plus,
@@ -125,6 +126,7 @@ export default function ContactsPage() {
   const { mutate: exportContacts } = useExportContacts();
   const { data: emailTemplates } = useEmailTemplates();
   const { mutate: sendEmail, isPending: sendingEmail } = useSendEmailToContacts();
+  const confirm = useConfirm();
 
   const contacts = data?.data ?? [];
   const meta = data?.meta;
@@ -187,15 +189,17 @@ export default function ContactsPage() {
     }
   };
 
-  const handleDelete = (id: number) => {
-    if (confirm("Delete this contact? This cannot be undone.")) {
+  const handleDelete = async (id: number) => {
+    const ok = await confirm({ title: "Delete Contact", description: "Delete this contact? This cannot be undone.", confirmLabel: "Delete", variant: "danger" });
+    if (ok) {
       deleteContact(id);
     }
   };
 
-  const handleBulkDelete = () => {
+  const handleBulkDelete = async () => {
     if (selectedIds.size === 0) return;
-    if (!confirm(`Delete ${selectedIds.size} contact(s)?`)) return;
+    const ok = await confirm({ title: "Delete Contacts", description: `Delete ${selectedIds.size} contact(s)? This cannot be undone.`, confirmLabel: "Delete All", variant: "danger" });
+    if (!ok) return;
     selectedIds.forEach((id) => deleteContact(id));
     setSelectedIds(new Set());
   };
@@ -803,9 +807,9 @@ export default function ContactsPage() {
                     <span className="text-sm font-medium text-foreground">{tag.name}</span>
                   </div>
                   <button
-                    onClick={() => {
-                      if (confirm(`Delete tag "${tag.name}"? It will be removed from all contacts.`))
-                        deleteTag(tag.id);
+                    onClick={async () => {
+                      const ok = await confirm({ title: "Delete Tag", description: `Delete tag "${tag.name}"? It will be removed from all contacts.`, confirmLabel: "Delete", variant: "danger" });
+                      if (ok) deleteTag(tag.id);
                     }}
                     className="rounded-lg p-1 text-text-muted hover:bg-danger/10 hover:text-danger transition-colors"
                   >

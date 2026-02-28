@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   ArrowLeft,
@@ -27,6 +27,7 @@ import {
   useDeleteEventType,
   useSetAvailability,
 } from "@/hooks/use-booking";
+import { useConfirm } from "@/hooks/use-confirm";
 import type { BookingEventType, Availability } from "@repo/shared/types";
 
 // ---------------------------------------------------------------------------
@@ -210,6 +211,8 @@ function BookingShareLinksModal({
 // ---------------------------------------------------------------------------
 
 export default function CalendarDetailPage() {
+  const confirm = useConfirm();
+  const router = useRouter();
   const params = useParams();
   const calendarId = Number(params.id);
 
@@ -339,8 +342,14 @@ export default function CalendarDetailPage() {
     }
   };
 
-  const handleDeleteEventType = (id: number) => {
-    if (confirm("Delete this event type? This cannot be undone.")) {
+  const handleDeleteEventType = async (id: number) => {
+    const ok = await confirm({
+      title: "Delete Event Type",
+      description: "Delete this event type? This cannot be undone.",
+      confirmLabel: "Delete",
+      variant: "danger",
+    });
+    if (ok) {
       deleteEventType(id);
     }
   };
@@ -784,22 +793,23 @@ export default function CalendarDetailPage() {
               Deleting this calendar will remove all associated event types and
               availability. This action cannot be undone.
             </p>
-            <Link
-              href="/booking"
-              onClick={(e) => {
-                if (
-                  !confirm(
-                    "Are you sure you want to delete this calendar? This cannot be undone."
-                  )
-                ) {
-                  e.preventDefault();
+            <button
+              onClick={async () => {
+                const ok = await confirm({
+                  title: "Delete Calendar",
+                  description: "Are you sure you want to delete this calendar? This cannot be undone.",
+                  confirmLabel: "Delete",
+                  variant: "danger",
+                });
+                if (ok) {
+                  router.push("/booking");
                 }
               }}
               className="inline-flex items-center gap-2 rounded-lg border border-red-500/30 px-4 py-2 text-sm font-medium text-red-400 hover:bg-red-500/10 transition-colors"
             >
               <Trash2 className="h-4 w-4" />
               Delete Calendar
-            </Link>
+            </button>
           </div>
         </div>
       )}

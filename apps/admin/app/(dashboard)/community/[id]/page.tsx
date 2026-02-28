@@ -29,6 +29,7 @@ import {
   usePinThread,
   useCloseThread,
 } from "@/hooks/use-community";
+import { useConfirm } from "@/hooks/use-confirm";
 import type { Space, CommunityMember, Thread } from "@repo/shared/types";
 
 // ---------------------------------------------------------------------------
@@ -140,6 +141,7 @@ function initials(firstName?: string, lastName?: string): string {
 // ---------------------------------------------------------------------------
 
 export default function CommunitySpaceDetailPage() {
+  const confirm = useConfirm();
   const params = useParams();
   const spaceId = Number(params.id);
 
@@ -241,8 +243,14 @@ export default function CommunitySpaceDetailPage() {
     );
   };
 
-  const handleRemoveMember = (memberId: number) => {
-    if (confirm("Remove this member from the space?")) {
+  const handleRemoveMember = async (memberId: number) => {
+    const ok = await confirm({
+      title: "Remove Member",
+      description: "Remove this member from the space?",
+      confirmLabel: "Remove",
+      variant: "danger",
+    });
+    if (ok) {
       removeMember(memberId);
     }
   };

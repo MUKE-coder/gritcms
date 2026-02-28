@@ -27,6 +27,7 @@ import {
   Clock,
 } from "@/lib/icons";
 import { getIcon } from "@/lib/icons";
+import { useConfirm } from "@/hooks/use-confirm";
 import type { Space, CommunityEvent } from "@repo/shared/types";
 
 const typeBadge: Record<string, string> = {
@@ -75,6 +76,7 @@ interface EventModalState {
 }
 
 export default function CommunityPage() {
+  const confirm = useConfirm();
   // --- Spaces state ---
   const { data: spaces, isLoading: spacesLoading } = useSpaces();
   const { mutate: createSpace } = useCreateSpace();
@@ -288,13 +290,14 @@ export default function CommunityPage() {
                           <Pencil className="h-4 w-4" />
                         </button>
                         <button
-                          onClick={() => {
-                            if (
-                              confirm(
-                                `Delete "${space.name}"? This cannot be undone.`
-                              )
-                            )
-                              deleteSpace(space.id);
+                          onClick={async () => {
+                            const ok = await confirm({
+                              title: "Delete Space",
+                              description: `Delete "${space.name}"? This cannot be undone.`,
+                              confirmLabel: "Delete",
+                              variant: "danger",
+                            });
+                            if (ok) deleteSpace(space.id);
                           }}
                           className="rounded-lg p-1.5 text-text-muted hover:bg-red-500/10 hover:text-red-400"
                           title="Delete space"
@@ -343,13 +346,14 @@ export default function CommunityPage() {
                       {event.title}
                     </h3>
                     <button
-                      onClick={() => {
-                        if (
-                          confirm(
-                            `Delete event "${event.title}"? This cannot be undone.`
-                          )
-                        )
-                          deleteEvent(event.id);
+                      onClick={async () => {
+                        const ok = await confirm({
+                          title: "Delete Event",
+                          description: `Delete event "${event.title}"? This cannot be undone.`,
+                          confirmLabel: "Delete",
+                          variant: "danger",
+                        });
+                        if (ok) deleteEvent(event.id);
                       }}
                       className="rounded-lg p-1 text-text-muted hover:bg-red-500/10 hover:text-red-400 flex-shrink-0"
                       title="Delete event"

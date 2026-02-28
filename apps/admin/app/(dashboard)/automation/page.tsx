@@ -22,6 +22,7 @@ import {
   useDeleteWorkflow,
   useExecutions,
 } from "@/hooks/use-workflows";
+import { useConfirm } from "@/hooks/use-confirm";
 import type { Workflow, WorkflowExecution } from "@repo/shared/types";
 
 // ---------------------------------------------------------------------------
@@ -90,6 +91,7 @@ function triggerIcon(trigger: string) {
 // ---------------------------------------------------------------------------
 
 export default function AutomationPage() {
+  const confirm = useConfirm();
   // Tab state
   const [mainTab, setMainTab] = useState<MainTab>("workflows");
 
@@ -167,8 +169,14 @@ export default function AutomationPage() {
     );
   };
 
-  const handleDelete = (id: number) => {
-    if (confirm("Delete this workflow? This action cannot be undone.")) {
+  const handleDelete = async (id: number) => {
+    const ok = await confirm({
+      title: "Delete Workflow",
+      description: "Delete this workflow? This action cannot be undone.",
+      confirmLabel: "Delete",
+      variant: "danger",
+    });
+    if (ok) {
       deleteWorkflow(id);
     }
   };

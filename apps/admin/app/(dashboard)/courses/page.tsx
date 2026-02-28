@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useConfirm } from "@/hooks/use-confirm";
 import {
   useCourses,
   useDeleteCourse,
@@ -82,6 +83,7 @@ export default function CoursesPage() {
     search: search || undefined,
   });
 
+  const confirm = useConfirm();
   const { mutate: deleteCourse } = useDeleteCourse();
   const { mutate: duplicateCourse } = useDuplicateCourse();
   const { mutate: createCourse } = useCreateCourse();
@@ -444,9 +446,9 @@ export default function CoursesPage() {
                         <Pencil className="h-4 w-4" />
                       </Link>
                       <button
-                        onClick={() => {
-                          if (confirm("Duplicate this course?"))
-                            duplicateCourse(course.id);
+                        onClick={async () => {
+                          const ok = await confirm({ title: "Duplicate Course", description: "Create a copy of this course?", confirmLabel: "Duplicate" });
+                          if (ok) duplicateCourse(course.id);
                         }}
                         className="rounded-lg p-1.5 text-text-muted hover:bg-bg-hover hover:text-foreground"
                         title="Duplicate"
@@ -454,9 +456,9 @@ export default function CoursesPage() {
                         <Plus className="h-4 w-4" />
                       </button>
                       <button
-                        onClick={() => {
-                          if (confirm("Delete this course? This cannot be undone."))
-                            deleteCourse(course.id);
+                        onClick={async () => {
+                          const ok = await confirm({ title: "Delete Course", description: "Delete this course? This cannot be undone.", confirmLabel: "Delete", variant: "danger" });
+                          if (ok) deleteCourse(course.id);
                         }}
                         className="rounded-lg p-1.5 text-text-muted hover:bg-danger/10 hover:text-danger"
                         title="Delete"
