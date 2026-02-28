@@ -495,6 +495,7 @@ func Setup(db *gorm.DB, cfg *config.Config, svc *Services) *gin.Engine {
 		admin.GET("/email/dashboard", emailHandler.DashboardStats)
 
 		// Course management (admin)
+		admin.GET("/courses/dashboard", courseHandler.CourseDashboard)
 		admin.GET("/courses", courseHandler.ListCourses)
 		admin.GET("/courses/:id", courseHandler.GetCourse)
 		admin.POST("/courses", courseHandler.CreateCourse)

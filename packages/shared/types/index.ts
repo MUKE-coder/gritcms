@@ -97,6 +97,7 @@ export type {
   Subscription,
   SubStatus,
   RevenueDashboard,
+  CourseDashboard,
   CheckoutRequest,
   CheckoutResponse,
   CheckoutStatus,

@@ -69,10 +69,11 @@ func (h *PaymentHandler) Checkout(c *gin.Context) {
 		h.db.Save(&contact)
 	}
 
-	// Resolve product and price
-	var product models.Product
-	var price models.Price
+	// Resolve product/course and build order item
+	var subtotal float64
 	var currency string
+	var itemName string
+	var orderItem models.OrderItem
 
 	switch input.Type {
 	case "course":
@@ -93,54 +94,60 @@ func (h *PaymentHandler) Checkout(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "This course is free — no payment needed"})
 			return
 		}
-		if course.ProductID != nil {
-			if err := h.db.First(&product, *course.ProductID).Error; err != nil {
-				c.JSON(http.StatusNotFound, gin.H{"error": "Linked product not found"})
-				return
-			}
-		} else {
-			// Auto-create a product + price for the paid course
-			cur := course.Currency
-			if cur == "" {
-				cur = "USD"
-			}
-			product = models.Product{
-				TenantID:    1,
-				Name:        course.Title,
-				Slug:        course.Slug + "-product",
-				Type:        models.ProductTypeCourse,
-				Status:      "active",
-				Description: course.ShortDescription,
-			}
-			if err := h.db.Create(&product).Error; err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create product for course"})
-				return
-			}
-			price = models.Price{
-				TenantID:  1,
-				ProductID: product.ID,
-				Amount:    course.Price,
-				Currency:  cur,
-				Type:      models.PriceTypeOneTime,
-				SortOrder: 0,
-			}
-			if err := h.db.Create(&price).Error; err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create price for course"})
-				return
-			}
-			// Link product back to course
-			h.db.Model(&course).Update("product_id", product.ID)
-		}
+		subtotal = course.Price
 		currency = course.Currency
+		itemName = course.Title
+		orderItem = models.OrderItem{
+			TenantID:  1,
+			CourseID:  &course.ID,
+			Quantity:  1,
+			UnitPrice: course.Price,
+			Total:     course.Price,
+		}
 
 	case "product":
 		if input.ProductID == nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "product_id is required"})
 			return
 		}
+		var product models.Product
 		if err := h.db.First(&product, *input.ProductID).Error; err != nil {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Product not found"})
 			return
+		}
+		if product.Status != "active" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Product is not available"})
+			return
+		}
+
+		// Load price — auto-resolve default price if not specified
+		var price models.Price
+		if input.PriceID > 0 {
+			if err := h.db.First(&price, input.PriceID).Error; err != nil {
+				c.JSON(http.StatusNotFound, gin.H{"error": "Price not found"})
+				return
+			}
+			if price.ProductID != product.ID {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "Price does not belong to this product"})
+				return
+			}
+		} else {
+			if err := h.db.Where("product_id = ? AND type = ?", product.ID, models.PriceTypeOneTime).
+				Order("sort_order ASC").First(&price).Error; err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "No price found for this product"})
+				return
+			}
+		}
+		subtotal = price.Amount
+		currency = price.Currency
+		itemName = product.Name
+		orderItem = models.OrderItem{
+			TenantID:  1,
+			ProductID: &product.ID,
+			PriceID:   &price.ID,
+			Quantity:  1,
+			UnitPrice: price.Amount,
+			Total:     price.Amount,
 		}
 
 	default:
@@ -148,39 +155,11 @@ func (h *PaymentHandler) Checkout(c *gin.Context) {
 		return
 	}
 
-	if product.Status != "active" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Product is not available"})
-		return
-	}
-
-	// Load price — auto-resolve default price if not specified
-	if input.PriceID > 0 {
-		if err := h.db.First(&price, input.PriceID).Error; err != nil {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Price not found"})
-			return
-		}
-		if price.ProductID != product.ID {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Price does not belong to this product"})
-			return
-		}
-	} else {
-		// Auto-select the first one_time price for the product
-		if err := h.db.Where("product_id = ? AND type = ?", product.ID, models.PriceTypeOneTime).
-			Order("sort_order ASC").First(&price).Error; err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "No price found for this product"})
-			return
-		}
-	}
-
-	if currency == "" {
-		currency = price.Currency
-	}
 	if currency == "" {
 		currency = "USD"
 	}
 
-	// Calculate amount
-	subtotal := price.Amount
+	// Apply coupon discount
 	var discountAmount float64
 	var couponID *uint
 
@@ -217,7 +196,6 @@ func (h *PaymentHandler) Checkout(c *gin.Context) {
 		return
 	}
 
-	// price.Amount is already stored in cents (e.g. 3000 = $30.00)
 	amountInCents := int64(math.Round(totalAmount))
 
 	// Create pending order
@@ -233,16 +211,7 @@ func (h *PaymentHandler) Checkout(c *gin.Context) {
 		Currency:        currency,
 		PaymentProvider: "stripe",
 		CouponID:        couponID,
-		Items: []models.OrderItem{
-			{
-				TenantID:  1,
-				ProductID: product.ID,
-				PriceID:   &price.ID,
-				Quantity:  1,
-				UnitPrice: price.Amount,
-				Total:     price.Amount,
-			},
-		},
+		Items:           []models.OrderItem{orderItem},
 	}
 
 	if err := h.db.Create(&order).Error; err != nil {
@@ -262,7 +231,7 @@ func (h *PaymentHandler) Checkout(c *gin.Context) {
 		AutomaticPaymentMethods: &stripe.PaymentIntentAutomaticPaymentMethodsParams{
 			Enabled: stripe.Bool(true),
 		},
-		Description: stripe.String(product.Name),
+		Description:  stripe.String(itemName),
 		ReceiptEmail: stripe.String(u.Email),
 		Metadata: map[string]string{
 			"order_id":   fmt.Sprintf("%d", order.ID),
@@ -472,29 +441,46 @@ func (h *PaymentHandler) handlePaymentFailed(event stripe.Event) {
 	log.Printf("[webhook] Order %d payment failed (PI: %s)", order.ID, pi)
 }
 
-// fulfillOrder is a local wrapper to avoid circular imports.
-// It duplicates the logic from services.FulfillOrder.
+// fulfillOrder handles post-payment fulfillment: auto-enrolls in courses, etc.
 func fulfillOrder(db *gorm.DB, order *models.Order) {
 	for _, item := range order.Items {
-		var product models.Product
-		if err := db.First(&product, item.ProductID).Error; err != nil {
+		// Direct course purchase — enroll via CourseID
+		if item.CourseID != nil {
+			enrollment := models.CourseEnrollment{
+				TenantID:  1,
+				ContactID: order.ContactID,
+				CourseID:  *item.CourseID,
+				Status:    "active",
+				Source:    "purchase",
+			}
+			db.FirstOrCreate(&enrollment, models.CourseEnrollment{
+				ContactID: order.ContactID,
+				CourseID:  *item.CourseID,
+			})
 			continue
 		}
-		if product.Type == models.ProductTypeCourse {
-			var courses []models.Course
-			db.Where("product_id = ?", product.ID).Find(&courses)
-			for _, course := range courses {
-				enrollment := models.CourseEnrollment{
-					TenantID:  1,
-					ContactID: order.ContactID,
-					CourseID:  course.ID,
-					Status:    "active",
-					Source:    "purchase",
+		// Product purchase — check if product type is "course" (legacy/manual linkage)
+		if item.ProductID != nil {
+			var product models.Product
+			if err := db.First(&product, *item.ProductID).Error; err != nil {
+				continue
+			}
+			if product.Type == models.ProductTypeCourse {
+				var courses []models.Course
+				db.Where("product_id = ?", product.ID).Find(&courses)
+				for _, course := range courses {
+					enrollment := models.CourseEnrollment{
+						TenantID:  1,
+						ContactID: order.ContactID,
+						CourseID:  course.ID,
+						Status:    "active",
+						Source:    "purchase",
+					}
+					db.FirstOrCreate(&enrollment, models.CourseEnrollment{
+						ContactID: order.ContactID,
+						CourseID:  course.ID,
+					})
 				}
-				db.FirstOrCreate(&enrollment, models.CourseEnrollment{
-					ContactID: order.ContactID,
-					CourseID:  course.ID,
-				})
 			}
 		}
 	}

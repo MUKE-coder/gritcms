@@ -123,7 +123,8 @@ type OrderItem struct {
 	ID        uint           `gorm:"primarykey" json:"id"`
 	TenantID  uint           `gorm:"index;not null;default:1" json:"tenant_id"`
 	OrderID   uint           `gorm:"index;not null" json:"order_id"`
-	ProductID uint           `gorm:"index;not null" json:"product_id"`
+	ProductID *uint          `gorm:"index" json:"product_id"`
+	CourseID  *uint          `gorm:"index" json:"course_id"`
 	PriceID   *uint          `gorm:"index" json:"price_id"`
 	VariantID *uint          `gorm:"index" json:"variant_id"`
 	Quantity  int            `gorm:"default:1" json:"quantity"`
@@ -133,6 +134,7 @@ type OrderItem struct {
 	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
 
 	Product *Product `gorm:"foreignKey:ProductID" json:"product,omitempty"`
+	Course  *Course  `gorm:"foreignKey:CourseID" json:"course,omitempty"`
 }
 
 // --- Coupons ---

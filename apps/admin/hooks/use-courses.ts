@@ -14,8 +14,21 @@ import type {
   QuizAttempt,
   Certificate,
   CourseAnalytics,
+  CourseDashboard,
   Contact,
 } from "@repo/shared/types";
+
+// --- Course Dashboard ---
+
+export function useCourseDashboard() {
+  return useQuery({
+    queryKey: ["courses-dashboard"],
+    queryFn: async () => {
+      const { data } = await apiClient.get("/api/courses/dashboard");
+      return data.data as CourseDashboard;
+    },
+  });
+}
 
 // --- Courses ---
 

@@ -90,7 +90,8 @@ export interface OrderItem {
   id: number;
   tenant_id: number;
   order_id: number;
-  product_id: number;
+  product_id?: number | null;
+  course_id?: number | null;
   price_id: number | null;
   variant_id: number | null;
   quantity: number;
@@ -98,6 +99,7 @@ export interface OrderItem {
   total: number;
   created_at: string;
   product?: Product;
+  course?: import("./course").Course;
 }
 
 // --- Coupons ---
@@ -190,4 +192,12 @@ export interface RevenueDashboard {
   monthly_revenue: number;
   mrr: number;
   recent_orders: Order[];
+}
+
+export interface CourseDashboard {
+  total_courses: number;
+  published_courses: number;
+  total_enrollments: number;
+  course_revenue: number;
+  monthly_revenue: number;
 }

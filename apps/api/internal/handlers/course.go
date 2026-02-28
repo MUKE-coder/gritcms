@@ -949,6 +949,44 @@ func (h *CourseHandler) StudentMarkLessonComplete(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"data": progress})
 }
 
+// CourseDashboard returns aggregate stats for all courses.
+func (h *CourseHandler) CourseDashboard(c *gin.Context) {
+	var totalCourses int64
+	h.DB.Model(&models.Course{}).Count(&totalCourses)
+
+	var publishedCourses int64
+	h.DB.Model(&models.Course{}).Where("status = 'published'").Count(&publishedCourses)
+
+	var totalEnrollments int64
+	h.DB.Model(&models.CourseEnrollment{}).Count(&totalEnrollments)
+
+	// Revenue from course orders (order items with course_id set)
+	var courseRevenue float64
+	h.DB.Model(&models.Order{}).
+		Where("status = 'paid' AND id IN (?)",
+			h.DB.Model(&models.OrderItem{}).Select("order_id").Where("course_id IS NOT NULL"),
+		).
+		Select("COALESCE(SUM(total), 0)").Scan(&courseRevenue)
+
+	// Monthly course revenue
+	startOfMonth := time.Now().UTC().Truncate(24 * time.Hour).AddDate(0, 0, -time.Now().Day()+1)
+	var monthlyRevenue float64
+	h.DB.Model(&models.Order{}).
+		Where("status = 'paid' AND paid_at >= ? AND id IN (?)",
+			startOfMonth,
+			h.DB.Model(&models.OrderItem{}).Select("order_id").Where("course_id IS NOT NULL"),
+		).
+		Select("COALESCE(SUM(total), 0)").Scan(&monthlyRevenue)
+
+	c.JSON(http.StatusOK, gin.H{"data": gin.H{
+		"total_courses":     totalCourses,
+		"published_courses": publishedCourses,
+		"total_enrollments": totalEnrollments,
+		"course_revenue":    courseRevenue,
+		"monthly_revenue":   monthlyRevenue,
+	}})
+}
+
 func generateSlug(title string) string {
 	slug := strings.ToLower(title)
 	slug = strings.ReplaceAll(slug, " ", "-")
